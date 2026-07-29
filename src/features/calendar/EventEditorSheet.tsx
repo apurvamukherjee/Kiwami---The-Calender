@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Input, Switch, InputNumber, Segmented } from "antd";
+import { Button, Input, Switch, InputNumber, Segmented, Popconfirm, App } from "antd";
 import { TbTrash, TbCalendarOff, TbRepeat, TbMapPin, TbFlame, TbToolsKitchen2 } from "react-icons/tb";
 import { Sheet } from "../../components/Sheet";
 import { TimeSelect } from "../../components/TimeSelect";
@@ -28,6 +28,7 @@ const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 export function EventEditorSheet({ open, onClose, item, defaultDate, defaultTime, defaultEndTime }: Props) {
   useBackClose(open, onClose);
   const tokens = useTokens();
+  const { message } = App.useApp();
   const isEdit = !!item;
   const hasRule = !!item?.rule;
 
@@ -132,6 +133,7 @@ export function EventEditorSheet({ open, onClose, item, defaultDate, defaultTime
       void id;
     }
     hapticSuccess();
+    message.success(isEdit ? "Event updated" : "Event created");
     onClose();
   }
 
@@ -139,6 +141,7 @@ export function EventEditorSheet({ open, onClose, item, defaultDate, defaultTime
     if (!item?.event.id) return;
     await deleteOccurrence(item.event.id, item.date);
     hapticLight();
+    message.success("Occurrence deleted");
     onClose();
   }
 
@@ -146,6 +149,7 @@ export function EventEditorSheet({ open, onClose, item, defaultDate, defaultTime
     if (!item?.event.id) return;
     await deleteEvent(item.event.id);
     hapticLight();
+    message.success(hasRule ? "Series deleted" : "Event deleted");
     onClose();
   }
 
@@ -289,13 +293,27 @@ export function EventEditorSheet({ open, onClose, item, defaultDate, defaultTime
         {isEdit && (
           <div style={{ display: "flex", gap: 8 }}>
             {hasRule && (
-              <Button danger icon={<TbCalendarOff />} onClick={handleDeleteOccurrence} style={{ flex: 1 }}>
-                Delete this occurrence
-              </Button>
+              <Popconfirm
+                title="Delete this occurrence?"
+                description="Only this date is removed — the rest of the series stays."
+                okText="Delete" okButtonProps={{ danger: true }}
+                onConfirm={handleDeleteOccurrence}
+              >
+                <Button danger icon={<TbCalendarOff />} style={{ flex: 1 }}>
+                  Delete this occurrence
+                </Button>
+              </Popconfirm>
             )}
-            <Button danger icon={<TbTrash />} onClick={handleDeleteSeries} style={{ flex: 1 }}>
-              {hasRule ? "Delete series" : "Delete"}
-            </Button>
+            <Popconfirm
+              title={hasRule ? "Delete the whole series?" : "Delete this event?"}
+              description={hasRule ? "Every occurrence and its done/missed history goes with it. This can't be undone." : "This can't be undone."}
+              okText="Delete" okButtonProps={{ danger: true }}
+              onConfirm={handleDeleteSeries}
+            >
+              <Button danger icon={<TbTrash />} style={{ flex: 1 }}>
+                {hasRule ? "Delete series" : "Delete"}
+              </Button>
+            </Popconfirm>
           </div>
         )}
       </div>

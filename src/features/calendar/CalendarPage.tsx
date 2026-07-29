@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { Button, Segmented } from "antd";
-import { TbChevronLeft, TbChevronRight, TbPlus, TbSettings } from "react-icons/tb";
+import { Button, Segmented, DatePicker } from "antd";
+import { useLiveQuery } from "dexie-react-hooks";
+import { TbChevronLeft, TbChevronRight, TbPlus, TbSettings, TbFlame, TbToolsKitchen2, TbCalendarPlus, TbActivity, TbSearch } from "react-icons/tb";
+import { db } from "../../db/db";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { SettingsSheet } from "../../components/SettingsSheet";
+import { CommandPalette } from "../../components/CommandPalette";
 import { useCalendarRange, type CalendarView } from "./useCalendarRange";
 import { useCalendarEvents, type CalendarItem } from "./useCalendarEvents";
 import { MonthView } from "./MonthView";
@@ -12,6 +15,7 @@ import { DayView } from "./DayView";
 import { AgendaView } from "./AgendaView";
 import { EventEditorSheet } from "./EventEditorSheet";
 import { RoutineDetailSheet } from "../routines/RoutineDetailSheet";
+import { YearHeatmapSheet } from "../routines/YearHeatmapSheet";
 import { FoodLogSheet } from "../food/FoodLogSheet";
 import { todayKey } from "../../lib/date.utils";
 
@@ -35,6 +39,8 @@ export function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(todayKey());
   const { rangeStart, rangeEnd } = useCalendarRange(view, currentDate);
   const items = useCalendarEvents(rangeStart, rangeEnd);
+  const eventCount = useLiveQuery(() => db.events.count(), []);
+  const showEmptyState = eventCount === 0;
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CalendarItem | null>(null);
@@ -44,10 +50,43 @@ export function CalendarPage() {
   const [routineItem, setRoutineItem] = useState<CalendarItem | null>(null);
   const [foodSheetOpen, setFoodSheetOpen] = useState(false);
   const [foodItem, setFoodItem] = useState<CalendarItem | null>(null);
+  const [yearHeatmapOpen, setYearHeatmapOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
     if (isMobile && (view === "month" || view === "week")) setView("day");
   }, [isMobile, view]);
+
+  const anySheetOpen = editorOpen || routineSheetOpen || foodSheetOpen || settingsOpen;
+
+  // Arrow-key date nav + "T" for Today — skipped while typing anywhere or
+  // while a sheet is open, so it never fights with form inputs.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (anySheetOpen) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      if (e.key === "ArrowLeft") step(-1);
+      else if (e.key === "ArrowRight") step(1);
+      else if (e.key === "t" || e.key === "T") setCurrentDate(todayKey());
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
+  // Ctrl/Cmd+K always works, even while typing elsewhere — the one
+  // deliberate exception to the "skip while a sheet is open" rule above,
+  // matching how command palettes behave in most apps that have one.
+  useEffect(() => {
+    function onPaletteKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    }
+    window.addEventListener("keydown", onPaletteKey);
+    return () => window.removeEventListener("keydown", onPaletteKey);
+  }, []);
 
   const periodLabel = useMemo(() => {
     const d = dayjs(currentDate);
@@ -106,16 +145,51 @@ export function CalendarPage() {
       }} className="safe-top">
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <Button size="small" onClick={() => setCurrentDate(todayKey())}>Today</Button>
-          <Button size="small" type="text" icon={<TbChevronLeft size={16} />} onClick={() => step(-1)} />
-          <Button size="small" type="text" icon={<TbChevronRight size={16} />} onClick={() => step(1)} />
+          <Button size="small" type="text" icon={<TbChevronLeft size={16} />} onClick={() => step(-1)} aria-label="Previous period" />
+          <Button size="small" type="text" icon={<TbChevronRight size={16} />} onClick={() => step(1)} aria-label="Next period" />
+          <DatePicker
+            size="small"
+            value={dayjs(currentDate)}
+            onChange={(d) => d && setCurrentDate(d.format("YYYY-MM-DD"))}
+            allowClear={false}
+            inputReadOnly
+            format="D MMM 'YY"
+            style={{ width: 100 }}
+            aria-label="Jump to date"
+          />
         </div>
         <div style={{ fontSize: 15, fontWeight: 800, flex: 1, minWidth: 140 }}>{periodLabel}</div>
         <Segmented value={view} onChange={(v) => setView(v as CalendarView)} options={isMobile ? MOBILE_VIEWS : DESKTOP_VIEWS} />
         <Button type="primary" icon={<TbPlus size={15} />} onClick={() => openCreate()}>New</Button>
-        <Button type="text" icon={<TbSettings size={17} />} onClick={() => setSettingsOpen(true)} />
+        <Button type="text" icon={<TbSearch size={16} />} onClick={() => setPaletteOpen(true)} aria-label="Search (Ctrl+K)" />
+        <Button type="text" icon={<TbActivity size={17} />} onClick={() => setYearHeatmapOpen(true)} aria-label="Year in review" />
+        <Button type="text" icon={<TbSettings size={17} />} onClick={() => setSettingsOpen(true)} aria-label="Settings" />
       </div>
 
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+        {showEmptyState && (
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 10, display: "flex",
+            alignItems: "center", justifyContent: "center", pointerEvents: "none",
+          }}>
+            <div style={{
+              pointerEvents: "auto", maxWidth: 380, textAlign: "center", padding: 28,
+              background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16,
+              boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
+            }}>
+              <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 8 }}>Nothing here yet</div>
+              <div style={{ fontSize: 13, color: "var(--ink-soft)", lineHeight: 1.6, marginBottom: 16 }}>
+                Create a plain event for anything one-off. Mark it a{" "}
+                <TbFlame size={13} style={{ verticalAlign: -2, color: "var(--accent)" }} /> <b>Routine</b> to
+                track a daily streak, or a <TbToolsKitchen2 size={13} style={{ verticalAlign: -2, color: "var(--teal)" }} />{" "}
+                <b>Food slot</b> (via Settings) to log meal-time adherence.
+              </div>
+              <Button type="primary" icon={<TbCalendarPlus size={15} />} onClick={() => openCreate()}>
+                New event
+              </Button>
+            </div>
+          </div>
+        )}
         {view === "month" && (
           <MonthView rangeStart={rangeStart} rangeEnd={rangeEnd} currentDate={currentDate}
             items={items} onTapItem={openEdit} onSelectDay={selectDay} />
@@ -152,6 +226,13 @@ export function CalendarPage() {
         onEdit={(it) => { setEditingItem(it); setEditorOpen(true); }}
       />
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <YearHeatmapSheet open={yearHeatmapOpen} onClose={() => setYearHeatmapOpen(false)} />
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onGoToDate={selectDay}
+        onGoToToday={() => setCurrentDate(todayKey())}
+      />
     </div>
   );
 }

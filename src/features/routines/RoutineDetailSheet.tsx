@@ -2,7 +2,7 @@ import dayjs from "dayjs";
 import { Button } from "antd";
 import { TbCheck, TbX, TbFlame } from "react-icons/tb";
 import { Sheet } from "../../components/Sheet";
-import { EmberChain } from "../../components/EmberChain";
+import { EmberChain, STREAK_MILESTONES } from "../../components/EmberChain";
 import { useBackClose } from "../../hooks/useBackClose";
 import { useRecentBeads, useStreakCount } from "./useRoutineStreak";
 import { setOccurrenceStatus, useOccurrenceStatus } from "../../lib/occurrences";
@@ -48,12 +48,18 @@ export function RoutineDetailSheet({ open, onClose, item, onEdit }: Props) {
           <span style={{ fontSize: 13, color: "var(--ink-soft)", fontWeight: 600 }}>day streak</span>
         </div>
 
-        <EmberChain beads={beads} size="full" />
+        <EmberChain beads={beads} size="full" milestoneStreak={streak} />
 
         <div style={{ fontSize: 12, color: "var(--ink-soft)" }}>
           {dayjs(item.date).format("dddd, D MMMM")} ·{" "}
           {status === "done" ? "Done" : status === "missed" ? "Missed" : "Not yet marked"}
         </div>
+
+        {STREAK_MILESTONES.includes(streak) && status === "done" && (
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)" }}>
+            🔥 {streak}-day milestone!
+          </div>
+        )}
 
         <div style={{ display: "flex", gap: 10, width: "100%" }}>
           <Button block size="large" type={status === "done" ? "primary" : "default"} icon={<TbCheck />} onClick={() => mark("done")}>

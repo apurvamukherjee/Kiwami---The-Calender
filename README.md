@@ -54,6 +54,13 @@ account, no server, your data never leaves your device.
 - 🔒 **100% local** — IndexedDB via Dexie is the source of truth. A Convex
   schema exists for future background sync, but nothing leaves your device
   today.
+- 🗓️ **Ember Year Heatmap** — a GitHub-contributions-style grid for any
+  routine's whole year, colored with the same ember/ash palette as the
+  chain instead of green squares.
+- ⌨️ **Command Palette (Ctrl/Cmd+K)** — fuzzy search across every event by
+  title, jump straight to its date, or jump to Today, all keyboard-driven.
+- 💎 **Forged streak milestones** — hit a 7/30/100/365-day streak and that
+  day's bead forges into a faceted diamond with a one-time burst animation.
 
 ## 📸 Screenshots
 
@@ -95,6 +102,24 @@ else (sheets, forms, drag targets) is touch-sized by default.
 
 </td>
 </tr>
+<tr>
+<td>
+
+**Ember Year Heatmap** — GitHub-contributions-style, per routine, colored
+with the Ember Chain's own palette.
+
+<img src="docs/screenshots/year-heatmap-dark.png" alt="Ember Year Heatmap" width="100%">
+
+</td>
+<td>
+
+**Command Palette** — Ctrl/Cmd+K or the toolbar search icon, one search
+surface either way.
+
+<img src="docs/screenshots/command-palette-dark.png" alt="Command Palette search" width="100%">
+
+</td>
+</tr>
 </table>
 
 ## 📦 What's inside
@@ -107,7 +132,10 @@ else (sheets, forms, drag targets) is touch-sized by default.
 | 📃 | **Agenda** | Chronological list grouped by day, rolling 30-day window |
 | 🔥 | **Routines** | Recurring blocks that must be marked Done/Missed per occurrence; cached streak count; auto-miss sweep breaks a streak if a past day is left unresolved |
 | 🍽️ | **Food-time slots** | Named, retimeable recurring slots with a one-tap Ate/Skipped log — adherence only, no macro tracking |
+| 🗓️ | **Year in review** | Per-routine GitHub-style heatmap, pick any routine and year |
+| ⌨️ | **Command Palette** | Ctrl/Cmd+K or the toolbar search icon — search by title, jump to a date, jump to Today |
 | ⚙️ | **Settings** | Theme toggle (dark/light, respects system default), food-slot management |
+| 🔑 | **Keyboard** | ←/→ step the period, `T` jumps to Today, Ctrl/Cmd+K opens search |
 
 ## 🛠 Tech stack
 

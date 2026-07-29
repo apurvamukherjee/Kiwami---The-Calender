@@ -1,6 +1,6 @@
 import { useState } from "react";
 import dayjs from "dayjs";
-import { Button, Input } from "antd";
+import { Button, Input, Popconfirm, App } from "antd";
 import { TbTrash, TbPlus, TbToolsKitchen2 } from "react-icons/tb";
 import { TimeSelect } from "../../components/TimeSelect";
 import { useFoodSlots, addFoodSlot, renameFoodSlot, retimeFoodSlot, removeFoodSlot } from "./useFoodSlots";
@@ -8,6 +8,7 @@ import type { EventDto } from "../../db/types";
 
 export function FoodSlotSettings() {
   const slots = useFoodSlots();
+  const { message } = App.useApp();
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newTime, setNewTime] = useState("08:00");
@@ -15,6 +16,7 @@ export function FoodSlotSettings() {
   async function handleAdd() {
     if (!newTitle.trim()) return;
     await addFoodSlot(newTitle.trim(), newTime);
+    message.success(`${newTitle.trim()} added`);
     setNewTitle("");
     setNewTime("08:00");
     setAdding(false);
@@ -56,6 +58,7 @@ export function FoodSlotSettings() {
 }
 
 function FoodSlotRow({ slot }: { slot: EventDto }) {
+  const { message } = App.useApp();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(slot.title);
   const [time, setTime] = useState(dayjs(slot.startTime).format("HH:mm"));
@@ -64,7 +67,14 @@ function FoodSlotRow({ slot }: { slot: EventDto }) {
     if (!slot.id) return;
     if (title.trim() && title.trim() !== slot.title) await renameFoodSlot(slot.id, title.trim());
     if (time !== dayjs(slot.startTime).format("HH:mm")) await retimeFoodSlot(slot.id, time);
+    message.success("Saved");
     setEditing(false);
+  }
+
+  async function remove() {
+    if (!slot.id) return;
+    await removeFoodSlot(slot.id);
+    message.success(`${slot.title} removed`);
   }
 
   if (editing) {
@@ -83,7 +93,14 @@ function FoodSlotRow({ slot }: { slot: EventDto }) {
         <span style={{ fontWeight: 600, fontSize: 13 }}>{slot.title}</span>
         <span style={{ fontSize: 12, color: "var(--ink-soft)", marginLeft: 8 }}>{dayjs(slot.startTime).format("HH:mm")}</span>
       </div>
-      <Button size="small" type="text" danger icon={<TbTrash size={14} />} onClick={() => slot.id && removeFoodSlot(slot.id)} />
+      <Popconfirm
+        title={`Remove ${slot.title}?`}
+        description="Its Ate/Skipped log history is removed too."
+        okText="Remove" okButtonProps={{ danger: true }}
+        onConfirm={remove}
+      >
+        <Button size="small" type="text" danger icon={<TbTrash size={14} />} aria-label={`Remove ${slot.title}`} />
+      </Popconfirm>
     </div>
   );
 }

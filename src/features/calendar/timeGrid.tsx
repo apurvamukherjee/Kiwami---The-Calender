@@ -16,9 +16,33 @@ import type { CalendarItem } from "./useCalendarEvents";
 
 export const HOUR_H = 56; // px per hour
 export const SNAP = 15; // snap to 15-min grid
-export const START_HOUR = 5; // grid starts at 5am
-export const END_HOUR = 23; // ends at 11pm
-export const TOTAL_H = (END_HOUR - START_HOUR) * HOUR_H;
+export const DEFAULT_START_HOUR = 5; // grid starts at 5am by default
+export const DEFAULT_END_HOUR = 23; // ends at 11pm by default
+
+export function totalHeight(startHour: number, endHour: number): number {
+  return (endHour - startHour) * HOUR_H;
+}
+
+// The default 5am-11pm window covers ordinary waking hours densely; an
+// event outside it used to just be invisible in Week/Day (it still rendered
+// fine in Month/Agenda, which don't use this grid) — this expands the
+// window, rounded to whole hours, only when something actually needs it.
+export function computeHourRange(items: CalendarItem[]): { startHour: number; endHour: number } {
+  let startHour = DEFAULT_START_HOUR;
+  let endHour = DEFAULT_END_HOUR;
+  for (const it of items) {
+    if (it.event.allDay || !it.time) continue;
+    const [h] = it.time.split(":").map(Number);
+    if (h < startHour) startHour = h;
+    let endH = h + 1;
+    if (it.endTime) {
+      const [eh, em] = it.endTime.split(":").map(Number);
+      endH = em > 0 ? eh + 1 : eh;
+    }
+    if (endH > endHour) endHour = Math.min(24, endH);
+  }
+  return { startHour, endHour };
+}
 
 export function isToday(date: string): boolean {
   return date === new Date().toISOString().slice(0, 10);
@@ -34,12 +58,14 @@ export function eventColor(event: EventDto, tokens: { accent: string; teal: stri
 
 // pointerEvents: "none" throughout — purely decorative, must never intercept
 // taps or TimeGridColumn could never see an "empty space" gesture underneath.
-export function HourGridLines({ showLabels = true }: { showLabels?: boolean }) {
-  const hours = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i);
+export function HourGridLines({ startHour, endHour, showLabels = true }: {
+  startHour: number; endHour: number; showLabels?: boolean;
+}) {
+  const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
   return (
     <div style={{ pointerEvents: "none" }}>
       {hours.map((h) => {
-        const top = (h - START_HOUR) * HOUR_H;
+        const top = (h - startHour) * HOUR_H;
         return (
           <div key={h} style={{ position: "absolute", top, left: 0, right: 0, height: HOUR_H }}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "var(--border)", opacity: 0.6 }} />
@@ -49,7 +75,7 @@ export function HourGridLines({ showLabels = true }: { showLabels?: boolean }) {
                 fontSize: 10, color: "var(--ink-soft)", fontWeight: 600,
                 fontVariantNumeric: "tabular-nums",
               }}>
-                {String(h).padStart(2, "0")}:00
+                {String(h % 24).padStart(2, "0")}:00
               </span>
             )}
           </div>
@@ -59,11 +85,13 @@ export function HourGridLines({ showLabels = true }: { showLabels?: boolean }) {
   );
 }
 
-export function NowIndicator({ date, left = 46, right = 8 }: { date: string; left?: number; right?: number }) {
+export function NowIndicator({ date, startHour, endHour, left = 46, right = 8 }: {
+  date: string; startHour: number; endHour: number; left?: number; right?: number;
+}) {
   if (!isToday(date)) return null;
   const now = new Date();
-  const mins = (now.getHours() - START_HOUR) * 60 + now.getMinutes();
-  if (mins < 0 || mins > TOTAL_H) return null;
+  const mins = (now.getHours() - startHour) * 60 + now.getMinutes();
+  if (mins < 0 || mins > totalHeight(startHour, endHour)) return null;
   return (
     <div style={{ position: "absolute", top: mins, left, right, height: 2, background: "var(--accent)", borderRadius: 1, zIndex: 5, pointerEvents: "none" }}>
       <div style={{ position: "absolute", left: -4, top: -4, width: 10, height: 10, borderRadius: "50%", background: "var(--accent)" }} />
@@ -71,26 +99,29 @@ export function NowIndicator({ date, left = 46, right = 8 }: { date: string; lef
   );
 }
 
-function snapMinutes(y: number): number {
+function snapMinutes(y: number, totalH: number): number {
   const snapped = Math.round(y / SNAP) * SNAP;
-  return Math.max(0, Math.min(TOTAL_H - 15, snapped));
+  return Math.max(0, Math.min(totalH - 15, snapped));
 }
-function minutesToTime(mins: number): string {
-  const h = START_HOUR + Math.floor(mins / 60);
+function minutesToTime(mins: number, startHour: number): string {
+  const h = startHour + Math.floor(mins / 60);
   const m = mins % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  return `${String(h % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 const LONG_PRESS_MS = 400;
 const MOVE_CANCEL_PX = 8;
 
+// Only used for relative overlap comparisons within one render, so the
+// reference point doesn't matter as long as it's the same for every item —
+// plain minutes-since-midnight works regardless of the grid's own startHour.
 function itemSpan(item: CalendarItem): [number, number] {
   const [h, m] = (item.time ?? "09:00").split(":").map(Number);
-  const start = (h - START_HOUR) * 60 + m;
+  const start = h * 60 + m;
   let end = start + 30;
   if (item.endTime) {
     const [eh, em] = item.endTime.split(":").map(Number);
-    end = Math.max(start + 15, (eh - START_HOUR) * 60 + em);
+    end = Math.max(start + 15, eh * 60 + em);
   }
   return [start, end];
 }
@@ -145,14 +176,17 @@ export function layoutDayItems(items: CalendarItem[]): Map<CalendarItem, { col: 
 // time range and calls onCreateAt; a plain quick tap on empty space fires
 // onEmptyTap instead (WeekView uses it to drill into DayView). The
 // threshold exists so ordinary vertical scrolling never misfires as create.
-export function TimeGridColumn({ date, onCreateAt, onEmptyTap, style, children }: {
+export function TimeGridColumn({ date, startHour, endHour, onCreateAt, onEmptyTap, style, children }: {
   date: string;
+  startHour: number;
+  endHour: number;
   onCreateAt?: (date: string, time: string, endTime: string) => void;
   onEmptyTap?: () => void;
   style?: CSSProperties;
   children: ReactNode;
 }) {
   const tokens = useTokens();
+  const totalH = totalHeight(startHour, endHour);
   const pressTimer = useRef<number | null>(null);
   const startYRef = useRef(0);
   const [dragRange, setDragRange] = useState<{ start: number; end: number } | null>(null);
@@ -181,11 +215,11 @@ export function TimeGridColumn({ date, onCreateAt, onEmptyTap, style, children }
   }
   function endDrag() {
     if (dragRange) {
-      const a = snapMinutes(Math.min(dragRange.start, dragRange.end));
-      const bRaw = snapMinutes(Math.max(dragRange.start, dragRange.end));
+      const a = snapMinutes(Math.min(dragRange.start, dragRange.end), totalH);
+      const bRaw = snapMinutes(Math.max(dragRange.start, dragRange.end), totalH);
       const b = Math.max(a + 30, bRaw);
       setDragRange(null);
-      onCreateAt?.(date, minutesToTime(a), minutesToTime(b));
+      onCreateAt?.(date, minutesToTime(a, startHour), minutesToTime(b, startHour));
       return;
     }
     if (pressTimer.current) {
@@ -225,6 +259,8 @@ export function TimeGridColumn({ date, onCreateAt, onEmptyTap, style, children }
 
 interface TimeBlockProps {
   item: CalendarItem;
+  startHour: number;
+  endHour: number;
   onTap?: (item: CalendarItem) => void;
   insetLeft?: number;
   insetRight?: number;
@@ -242,7 +278,7 @@ interface TimeBlockProps {
 // override, so moving one instance would either have to silently move the
 // whole series or be a dead end — instead they're tap-only (open the editor
 // to change the series' time) and show a repeat glyph instead of a grip handle.
-export function TimeBlock({ item, onTap, insetLeft = 52, insetRight = 8, compact = false, col = 0, cols = 1 }: TimeBlockProps) {
+export function TimeBlock({ item, startHour, endHour, onTap, insetLeft = 52, insetRight = 8, compact = false, col = 0, cols = 1 }: TimeBlockProps) {
   const [dragging, setDragging] = useState(false);
   const dragControls = useDragControls();
   const pressTimer = useRef<number | null>(null);
@@ -250,7 +286,8 @@ export function TimeBlock({ item, onTap, insetLeft = 52, insetRight = 8, compact
   const tokens = useTokens();
   const color = eventColor(item.event, tokens);
   const [h, m] = (item.time ?? "09:00").split(":").map(Number);
-  const top = (h - START_HOUR) * 60 + m;
+  const top = (h - startHour) * 60 + m;
+  const totalH = totalHeight(startHour, endHour);
   const draggable = !item.rule;
 
   let height = 30;
@@ -285,9 +322,9 @@ export function TimeBlock({ item, onTap, insetLeft = 52, insetRight = 8, compact
   async function handleDragEnd(_: unknown, info: { offset: { y: number } }) {
     setDragging(false);
     if (!item.event.id) return;
-    const newTop = Math.max(0, Math.min(TOTAL_H - height, top + info.offset.y));
+    const newTop = Math.max(0, Math.min(totalH - height, top + info.offset.y));
     const snapped = Math.round(newTop / SNAP) * SNAP;
-    const newTime = minutesToTime(snapped);
+    const newTime = minutesToTime(snapped, startHour);
 
     let newEndTime: string | undefined;
     if (item.endTime) {
@@ -366,22 +403,25 @@ export function TimeBlock({ item, onTap, insetLeft = 52, insetRight = 8, compact
         )}
       </div>
       {!compact && draggable && !done && !missed && (
-        <ResizeHandle item={item} top={top} height={height} />
+        <ResizeHandle item={item} top={top} height={height} startHour={startHour} endHour={endHour} />
       )}
     </motion.div>
   );
 }
 
-function ResizeHandle({ item, top, height }: { item: CalendarItem; top: number; height: number }) {
+function ResizeHandle({ item, top, height, startHour, endHour }: {
+  item: CalendarItem; top: number; height: number; startHour: number; endHour: number;
+}) {
   const [dragging, setDragging] = useState(false);
+  const totalH = totalHeight(startHour, endHour);
 
   async function handleDragEnd(_: unknown, info: { offset: { y: number } }) {
     setDragging(false);
     if (!item.event.id || !item.time) return;
     const rawHeight = height + info.offset.y;
     const snappedHeight = Math.max(15, Math.round(rawHeight / SNAP) * SNAP);
-    const endMin = Math.min(TOTAL_H, top + snappedHeight);
-    const newEndTime = minutesToTime(Math.max(top + 15, endMin));
+    const endMin = Math.min(totalH, top + snappedHeight);
+    const newEndTime = minutesToTime(Math.max(top + 15, endMin), startHour);
     await updateEvent(item.event.id, { endTime: combineDateTime(item.date, newEndTime) });
     hapticLight();
   }

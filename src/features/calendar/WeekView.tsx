@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import dayjs from "dayjs";
 import { useTokens } from "../../hooks/useTokens";
 import {
-  HOUR_H, START_HOUR, TOTAL_H, HourGridLines, NowIndicator,
+  HOUR_H, HourGridLines, NowIndicator, totalHeight, computeHourRange,
   TimeBlock, TimeGridColumn, isToday, layoutDayItems, eventColor,
 } from "./timeGrid";
 import type { CalendarItem } from "./useCalendarEvents";
@@ -50,11 +50,17 @@ export function WeekView({ rangeStart, items, onTapItem, onCreateAt, onSelectDay
 
   const hasAllDay = dates.some((d) => (allDayByDate.get(d) ?? []).length > 0);
 
+  // One shared hour range across all 7 columns (they must stay aligned on
+  // one vertical axis) — expanded past the 5am-11pm default only if some
+  // item this week actually falls outside it.
+  const { startHour, endHour } = useMemo(() => computeHourRange(items), [items]);
+  const totalH = totalHeight(startHour, endHour);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!scrollRef.current) return;
     const h = new Date().getHours();
-    scrollRef.current.scrollTop = Math.max(0, (h - START_HOUR - 1) * HOUR_H);
+    scrollRef.current.scrollTop = Math.max(0, (h - startHour - 1) * HOUR_H);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeStart]);
 
@@ -106,21 +112,22 @@ export function WeekView({ rangeStart, items, onTapItem, onCreateAt, onSelectDay
       )}
 
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-        <div style={{ position: "relative", height: TOTAL_H, display: "grid", gridTemplateColumns: `${GUTTER}px repeat(7, 1fr)` }}>
+        <div style={{ position: "relative", height: totalH, display: "grid", gridTemplateColumns: `${GUTTER}px repeat(7, 1fr)` }}>
           <div style={{ position: "relative" }}>
-            <HourGridLines />
+            <HourGridLines startHour={startHour} endHour={endHour} />
           </div>
           {dates.map((d) => {
             const dayItems = byDate.get(d) ?? [];
             const layout = layoutDayItems(dayItems);
             return (
-              <TimeGridColumn key={d} date={d} onCreateAt={onCreateAt} onEmptyTap={() => onSelectDay(d)}
-                style={{ height: TOTAL_H, borderLeft: "1px solid var(--border)" }}>
-                <NowIndicator date={d} left={2} right={2} />
+              <TimeGridColumn key={d} date={d} startHour={startHour} endHour={endHour}
+                onCreateAt={onCreateAt} onEmptyTap={() => onSelectDay(d)}
+                style={{ height: totalH, borderLeft: "1px solid var(--border)" }}>
+                <NowIndicator date={d} startHour={startHour} endHour={endHour} left={2} right={2} />
                 {dayItems.map((it, i) => {
                   const pos = layout.get(it) ?? { col: 0, cols: 1 };
                   return (
-                    <TimeBlock key={`${it.event.id}-${i}`} item={it} onTap={onTapItem}
+                    <TimeBlock key={`${it.event.id}-${i}`} item={it} startHour={startHour} endHour={endHour} onTap={onTapItem}
                       insetLeft={2} insetRight={2} compact col={pos.col} cols={pos.cols} />
                   );
                 })}

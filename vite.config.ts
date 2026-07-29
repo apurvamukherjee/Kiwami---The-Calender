@@ -7,6 +7,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      // Registered explicitly via useRegisterSW() in App.tsx instead of the
+      // auto-injected script, so the app can surface `needRefresh` as a real
+      // "update available" banner rather than swapping silently.
+      injectRegister: false,
       includeAssets: ["favicon-32.png", "apple-touch-icon.png"],
       manifest: {
         id: "/",

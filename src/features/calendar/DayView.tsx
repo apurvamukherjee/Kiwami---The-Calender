@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import dayjs from "dayjs";
 import { useTokens } from "../../hooks/useTokens";
 import {
-  HOUR_H, START_HOUR, TOTAL_H, HourGridLines, NowIndicator,
+  HOUR_H, HourGridLines, NowIndicator, totalHeight, computeHourRange,
   TimeBlock, TimeGridColumn, layoutDayItems, eventColor,
 } from "./timeGrid";
 import type { CalendarItem } from "./useCalendarEvents";
@@ -24,13 +24,15 @@ export function DayView({ date, items, onTapItem, onCreateAt }: Props) {
   const dayItems = useMemo(() => items.filter((it) => it.date === date && !it.event.allDay), [items, date]);
   const allDayItems = useMemo(() => items.filter((it) => it.date === date && it.event.allDay), [items, date]);
   const layout = useMemo(() => layoutDayItems(dayItems), [dayItems]);
+  const { startHour, endHour } = useMemo(() => computeHourRange(dayItems), [dayItems]);
+  const totalH = totalHeight(startHour, endHour);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!scrollRef.current) return;
     const h = new Date().getHours();
-    scrollRef.current.scrollTop = Math.max(0, (h - START_HOUR - 1) * HOUR_H);
-  }, [date]);
+    scrollRef.current.scrollTop = Math.max(0, (h - startHour - 1) * HOUR_H);
+  }, [date, startHour]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -55,16 +57,17 @@ export function DayView({ date, items, onTapItem, onCreateAt }: Props) {
       )}
 
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-        <div style={{ position: "relative", height: TOTAL_H, display: "grid", gridTemplateColumns: `${GUTTER}px 1fr` }}>
+        <div style={{ position: "relative", height: totalH, display: "grid", gridTemplateColumns: `${GUTTER}px 1fr` }}>
           <div style={{ position: "relative" }}>
-            <HourGridLines />
+            <HourGridLines startHour={startHour} endHour={endHour} />
           </div>
-          <TimeGridColumn date={date} onCreateAt={onCreateAt} style={{ height: TOTAL_H, borderLeft: "1px solid var(--border)" }}>
-            <NowIndicator date={date} left={2} right={16} />
+          <TimeGridColumn date={date} startHour={startHour} endHour={endHour} onCreateAt={onCreateAt}
+            style={{ height: totalH, borderLeft: "1px solid var(--border)" }}>
+            <NowIndicator date={date} startHour={startHour} endHour={endHour} left={2} right={16} />
             {dayItems.map((it, i) => {
               const pos = layout.get(it) ?? { col: 0, cols: 1 };
               return (
-                <TimeBlock key={`${it.event.id}-${i}`} item={it} onTap={onTapItem}
+                <TimeBlock key={`${it.event.id}-${i}`} item={it} startHour={startHour} endHour={endHour} onTap={onTapItem}
                   insetLeft={10} insetRight={16} col={pos.col} cols={pos.cols} />
               );
             })}

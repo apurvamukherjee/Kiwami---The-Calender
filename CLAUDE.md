@@ -225,13 +225,76 @@ without a schema rewrite — but nothing calls it yet).
   `apple-touch-icon.png` are procedurally generated (a solid ember-colored
   ring, no actual logo/wordmark) via a one-off Node/zlib script, not real
   branding. Replace before shipping anywhere public.
-- **Ant Design bundles as one ~524kB (166kB gzip) chunk** — `vite build`
-  warns about this. No code-splitting has been done; fine for a personal
-  local-first app, worth revisiting with `manualChunks`/dynamic `import()`
-  if the bundle ever needs to shrink.
+- **Ant Design bundles as one ~635kB (201kB gzip) chunk** — `vite build`
+  warns about this (grew from ~524kB in Phase 1 with Phase 2's added
+  `Popconfirm`/`DatePicker`/`Select`/`Empty` usage). No code-splitting has
+  been done; fine for a personal local-first app, worth revisiting with
+  `manualChunks`/dynamic `import()` if the bundle ever needs to shrink.
 - **No drag-and-drop reschedule for recurring events** (see above) and no
   drag-to-create in Month view (cells are too small to grab reliably —
   same reasoning Zenith's own Month view uses).
+
+## Phase 2 — UX fixes + 3 flagship features (2026-07-29)
+
+10 UX fixes and 3 of 10 scoped "crazy cool" feature ideas (Ember Year
+Heatmap, Command Palette, forged-bead streak milestones), chosen by the
+user as "all fixes + 2-3 flagship features." Full scoping/reasoning lives
+in the session's plan; summarized here for future reference.
+
+**Fixes**: `Popconfirm` on every destructive action (`EventEditorSheet`'s
+two delete buttons, `FoodSlotSettings`'s remove) · toast feedback via
+`App.useApp()` on create/save/delete/add/rename (deliberately **not** on
+Done/Missed/Ate/Skipped — the Ember Chain glow updating live already is the
+feedback there, and a toast on every daily tap would get noisy) · a compact
+`DatePicker` in the toolbar for jumping to any date · the splash now gates
+on `sessionStorage["kiwami-splash-seen"]`, playing once per browser session
+instead of every reload · **`timeGrid.tsx`'s hour range is no longer a
+fixed 5am–11pm module constant** — `computeHourRange()` expands it (rounded
+to whole hours) only when an item actually falls outside the default,
+threaded as `startHour`/`endHour` props through `HourGridLines`/
+`NowIndicator`/`TimeGridColumn`/`TimeBlock`/`ResizeHandle` instead of each
+reading a free variable · `components/InstallPrompt.tsx` captures
+`beforeinstallprompt` for a real install banner · `vite.config.ts` now sets
+`injectRegister: false` and `App.tsx` calls `useRegisterSW()` from
+`virtual:pwa-register/react` directly, surfacing `needRefresh` as a visible
+"new version, Refresh" banner instead of swapping the service worker
+silently · a `useHasAnyEvents()`-gated empty-state card guides a first-run
+user · `useSearchEvents.ts` (title-substring match, resolved to each
+match's nearest occurrence via `expandOccurrences` over a ±180-day window)
+— **its UI was deliberately merged into the Command Palette below rather
+than built as a second, differently-shaped search surface** · arrow-key
+date nav + "T" for Today, plus `aria-label`s on every icon-only button.
+
+**Features**:
+- **Ember Year Heatmap** (`components/EmberYearGrid.tsx`,
+  `features/routines/{useRoutines,YearHeatmapSheet}.tsx`) — a real
+  GitHub-contributions-style grid (weeks as columns, weekdays as rows, month
+  labels aligned above), colored with the same `tokens.emberHot`/`tokens.ash`
+  as the Ember Chain. Deliberately **scoped per-routine** (a `Select` picks
+  which one) — a blended "all routines" view is a real follow-up idea, not
+  built here.
+- **Command Palette** (`components/CommandPalette.tsx`, Ctrl/Cmd+K or the
+  toolbar search icon) — one search surface behind two entry points, both
+  consuming `useSearchEvents`. **Real bug found and fixed here**: antd's
+  `Modal` grabs focus back onto its own wrapper right after opening (its own
+  focus-trap/accessibility handling), which raced the search `Input`'s
+  `autoFocus` and won — keystrokes silently went nowhere. Fixed via
+  `Modal`'s `afterOpenChange` callback explicitly focusing an `inputRef`
+  once the open transition settles, instead of relying on `autoFocus`.
+- **Forged-bead streak milestones** (`components/EmberChain.tsx`) — at
+  7/30/100/365-day streaks, today's bead renders as a rotated-diamond
+  "forged" shape with a one-time expanding-ring burst instead of a plain
+  circle. Takes `milestoneStreak?: number` — deliberately the event's *real*
+  cached `streakCount` (from `useStreakCount`, already available in
+  `RoutineDetailSheet`), **not** inferred from the visible bead window (a
+  compact 7-bead Agenda chain can't know a day-30 milestone was reached
+  outside it). The burst is keyed on `` `milestone-${milestoneStreak}` ``,
+  which is what makes it replay exactly when a *new* milestone is reached
+  and stay static on every subsequent reopen of the same streak count. The
+  plan called for a separate unit-tested `computeRunningStreaks` helper to
+  infer milestones from the bead window; using the already-correct cached
+  streak instead made that helper unnecessary, so it was never built —
+  simpler and strictly more correct.
 
 ## Verification this build has actually had
 
