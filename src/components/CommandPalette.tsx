@@ -5,6 +5,7 @@ import { Modal, Input, Empty } from "antd";
 import dayjs from "dayjs";
 import { TbSearch, TbCalendarEvent, TbFlame, TbToolsKitchen2, TbCalendarCheck } from "react-icons/tb";
 import { useSearchEvents } from "../features/calendar/useSearchEvents";
+import { useTokens } from "../hooks/useTokens";
 
 interface Props {
   open: boolean;
@@ -23,6 +24,7 @@ export function CommandPalette({ open, onClose, onGoToDate, onGoToToday }: Props
   const [activeIndex, setActiveIndex] = useState(0);
   const results = useSearchEvents(query);
   const inputRef = useRef<InputRef>(null);
+  const tokens = useTokens();
 
   useEffect(() => {
     if (open) {
@@ -68,7 +70,15 @@ export function CommandPalette({ open, onClose, onGoToDate, onGoToToday }: Props
       closable={false}
       width={480}
       style={{ top: 96 }}
-      styles={{ body: { padding: 0 } }}
+      styles={{
+        body: { padding: 0 },
+        content: {
+          background: `${tokens.surfaceLowest}e6`,
+          backdropFilter: "blur(20px)",
+          border: "1px solid transparent",
+        },
+      }}
+      className="kiwami-blade"
       // antd's Modal grabs focus back onto its own wrapper right after
       // opening (for its focus-trap/accessibility handling), which raced
       // Input's `autoFocus` and won — keystrokes landed on the modal div,
@@ -83,6 +93,7 @@ export function CommandPalette({ open, onClose, onGoToDate, onGoToToday }: Props
           placeholder="Search events, or jump to today…"
           variant="borderless"
           prefix={<TbSearch size={16} style={{ color: "var(--ink-soft)" }} />}
+          style={{ fontFamily: "var(--font-mono)" }}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />

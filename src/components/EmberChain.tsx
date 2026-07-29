@@ -45,7 +45,9 @@ export function EmberChain({ beads, size = "compact", milestoneStreak }: EmberCh
             // what makes the burst replay exactly when a *new* milestone is
             // reached (e.g. the tap that takes the streak to 7), and not
             // every time the sheet is reopened at an already-forged streak.
-            return <ForgedBead key={`milestone-${milestoneStreak}`} dim={dim} glow={glow} emberHot={tokens.emberHot} accent={tokens.accent} />;
+            // Colored with `diamond` — the one token in the app reserved
+            // exclusively for milestones, never reused as a general accent.
+            return <ForgedBead key={`milestone-${milestoneStreak}`} dim={dim} glow={glow} diamond={tokens.diamond} />;
           }
           if (status === "done") {
             return (
@@ -57,21 +59,53 @@ export function EmberChain({ beads, size = "compact", milestoneStreak }: EmberCh
                 transition={{ type: "spring", stiffness: 320, damping: 16 }}
                 style={{
                   width: dim, height: dim, borderRadius: "50%",
-                  background: tokens.emberHot,
+                  background: `linear-gradient(135deg, ${tokens.emberHot}, ${tokens.accent})`,
                   boxShadow: `0 0 ${glow}px ${tokens.accent}, 0 0 ${glow / 2}px ${tokens.emberHot}`,
                 }}
               />
             );
           }
           if (status === "missed") {
+            // A "crater" bead: a flat ash disc with a smaller, darker inset
+            // circle — cold and inert next to the lit gradient beads.
             return (
               <div key={i} style={{
                 width: dim, height: dim, borderRadius: "50%",
                 background: tokens.ash, opacity: 0.75,
-              }} />
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "inset 0 1px 2px rgba(0,0,0,0.3)",
+              }}>
+                <div style={{
+                  width: dim * 0.55, height: dim * 0.55, borderRadius: "50%",
+                  background: "var(--bg)", opacity: 0.4,
+                }} />
+              </div>
             );
           }
           if (status === "pending" && isToday) {
+            // The "full" size (RoutineDetailSheet's hero chain) gets a
+            // filled, pinging bead — a definitive "waiting for today" cue.
+            // "compact" (Agenda rows, many chains on screen at once) keeps
+            // the quieter hollow ring so a dense list doesn't feel noisy.
+            if (size === "full") {
+              return (
+                <div key={i} style={{ position: "relative", width: dim, height: dim }}>
+                  <motion.div
+                    animate={{ scale: [1, 1.9], opacity: [0.5, 0] }}
+                    transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
+                    style={{
+                      position: "absolute", inset: 0, borderRadius: "50%",
+                      background: tokens.accent,
+                    }}
+                  />
+                  <div style={{
+                    position: "absolute", inset: 0, borderRadius: "50%",
+                    background: tokens.accent, border: `2px solid ${tokens.emberHot}`, boxSizing: "border-box",
+                    boxShadow: `0 0 ${glow * 1.4}px ${tokens.accent}`,
+                  }} />
+                </div>
+              );
+            }
             return (
               <motion.div
                 key={i}
@@ -99,7 +133,7 @@ export function EmberChain({ beads, size = "compact", milestoneStreak }: EmberCh
 // instead of a plain circle, with a one-time expanding-ring burst. Historical
 // milestone days (revisited later) just show the diamond, statically — the
 // `key` on the parent is what limits the burst to the moment it's newly earned.
-function ForgedBead({ dim, glow, emberHot, accent }: { dim: number; glow: number; emberHot: string; accent: string }) {
+function ForgedBead({ dim, glow, diamond }: { dim: number; glow: number; diamond: string }) {
   return (
     <div style={{ position: "relative", width: dim, height: dim, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <motion.div
@@ -108,7 +142,7 @@ function ForgedBead({ dim, glow, emberHot, accent }: { dim: number; glow: number
         transition={{ duration: 0.9, ease: "easeOut" }}
         style={{
           position: "absolute", width: dim, height: dim, borderRadius: 3,
-          background: emberHot, transform: "rotate(45deg)",
+          background: diamond, transform: "rotate(45deg)",
         }}
       />
       <motion.div
@@ -117,8 +151,8 @@ function ForgedBead({ dim, glow, emberHot, accent }: { dim: number; glow: number
         transition={{ type: "spring", stiffness: 260, damping: 14 }}
         style={{
           width: dim * 0.82, height: dim * 0.82, borderRadius: 3,
-          background: emberHot,
-          boxShadow: `0 0 ${glow * 1.6}px ${accent}, 0 0 ${glow}px ${emberHot}`,
+          background: diamond,
+          boxShadow: `0 0 ${glow * 1.6}px ${diamond}, 0 0 ${glow}px ${diamond}`,
         }}
       />
     </div>

@@ -306,3 +306,60 @@ mark-done → streak-update round trip for both a routine and a food slot,
 and a genuine offline test (service worker installed, network context fully
 disabled, reloaded, and interacted with a live view switch) — all with zero
 console errors.
+
+## Phase 3 — "Ember & Ash" visual revamp (2026-07-30)
+
+A full re-theme, sourced from a Google Stitch MCP design system generated
+against Kiwami's own real README/screenshots. Stitch produced three static
+HTML mockups (Month View, Routine Detail, Agenda Mobile) with **invented**
+navigation/content ("Rituals"/"The Forge" nav, a 5-icon bottom nav, Material
+Symbols icons, a fictional desktop day-detail sidebar) that were deliberately
+**not** ported — only the token system and specific component treatments
+were extracted and applied to Kiwami's real, functional components.
+
+**Tokens**: obsidian surface scale (`#131313` base), ember primary
+(`#ff9f1c`/`#ffb86b` gradient), teal secondary (`#4fdbcc`, food — unchanged
+role), and a new **`diamond`** token (`#90dceb`) reserved *exclusively* for
+streak-milestone beads, never reused as a general accent. All in
+`src/theme.ts`'s `TOKENS` map and `src/index.css`'s CSS vars (dark values
+extracted from the real Stitch-generated Tailwind config; light is a
+hand-authored equivalent — Stitch's design system was dark-only).
+
+**Fonts**: Playfair Display (streak numerals, hero headlines) and JetBrains
+Mono (calendar day-numbers, timestamps, uppercase micro-labels via the new
+`.label-caps` utility class) self-hosted via `@fontsource/playfair-display`
++ `@fontsource/jetbrains-mono` — static woff2 only, zero CDN calls, so the
+offline-first guarantee (verified with the network fully disabled in Phase
+1) still holds. Confirmed no `fonts.googleapis.com`/`fonts.gstatic.com`
+reference anywhere in `dist/` after build.
+
+**A deliberate density/decoration split**: the original spec calls for the
+calendar grid to stay "clean, dense-information-friendly" — this is a
+daily-use tool, not a marketing page — while the Stitch mockups lean into
+decorative maximalism (heavy per-cell blur, 64px inline serif numerals).
+Resolved by intensity tier: **hero surfaces** (`RoutineDetailSheet`, the
+Command Palette, the splash) got the full glass/blur/glow/serif treatment;
+**dense grid surfaces** (`MonthView`, `AgendaView`, the toolbar) adopted the
+new palette and JetBrains Mono for data, but skip heavy blur and oversized
+numerals, preserving density.
+
+**`EmberChain.tsx`**: lit beads are now a gradient (`emberHot`→`accent`)
+instead of flat fill; missed beads got a layered "crater" look (a smaller
+inset circle); the forged/milestone bead recolored from ember to the new
+`diamond` token exclusively; the `size === "full"` today-pending bead (used
+only in `RoutineDetailSheet`) switched from a hollow pulsing ring to a
+filled dot with an outer ping ring — `size === "compact"` (Agenda rows)
+deliberately kept the quieter hollow ring, since a pinging bead next to a
+dozen other chains in a dense list would be noise, not signal.
+
+**`RoutineDetailSheet.tsx`** got the "Floating Blade" treatment: the antd
+`Modal`'s `content`/`header` panels go translucent with a 20px
+`backdropFilter` blur, plus a decorative blurred gradient bloom in one
+corner (`overflow: hidden` on an inner wrapper, not on `Sheet.tsx` itself —
+touching `Sheet.tsx`'s outer chrome risked breaking its tested
+mobile-bottom-sheet-vs-desktop-dialog radius logic, so the glass/bloom
+treatment lives entirely inside `RoutineDetailSheet`'s own content instead).
+The Command Palette got the same blur treatment plus a border that's
+transparent until the search input gains focus, then lights up
+`var(--diamond)` via a `.kiwami-blade:focus-within` CSS rule (no extra
+React state needed).

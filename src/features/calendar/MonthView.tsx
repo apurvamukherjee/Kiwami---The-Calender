@@ -53,7 +53,7 @@ export function MonthView({ rangeStart, rangeEnd, currentDate, items, onTapItem,
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: "1px solid var(--border)" }}>
         {WEEKDAY_LABELS.map((label) => (
-          <div key={label} style={{ padding: "8px 10px", fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: 0.4 }}>
+          <div key={label} style={{ padding: "8px 10px", fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
             {label}
           </div>
         ))}
@@ -70,18 +70,27 @@ export function MonthView({ rangeStart, rangeEnd, currentDate, items, onTapItem,
               key={date}
               onClick={() => onSelectDay(date)}
               style={{
-                borderRight: "1px solid var(--border)", borderBottom: "1px solid var(--border)",
+                position: "relative",
+                borderRight: "1px solid var(--border)", borderBottom: isToday ? "3px solid var(--accent)" : "1px solid var(--border)",
                 padding: 6, display: "flex", flexDirection: "column", gap: 3, cursor: "pointer",
                 opacity: inMonth ? 1 : 0.42,
                 background: isToday ? `${tokens.accent}12` : "transparent",
                 minHeight: 0, minWidth: 0, overflow: "hidden",
               }}
             >
+              {isToday && (
+                <div style={{
+                  position: "absolute", top: -20, right: -20, width: 60, height: 60, borderRadius: "50%",
+                  background: `radial-gradient(circle, ${tokens.accent}30, transparent 70%)`,
+                  filter: "blur(14px)", pointerEvents: "none",
+                }} />
+              )}
               <div style={{
                 width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 12, fontWeight: 700, flexShrink: 0,
+                fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, flexShrink: 0, letterSpacing: "0.02em",
                 background: isToday ? "var(--accent)" : "transparent",
                 color: isToday ? "#fff" : "var(--ink)",
+                position: "relative", zIndex: 1,
               }}>
                 {dayjs(date).date()}
               </div>
@@ -122,7 +131,7 @@ export function MonthView({ rangeStart, rangeEnd, currentDate, items, onTapItem,
                       </div>
                     }
                   >
-                    <div onClick={(e) => e.stopPropagation()} style={{ fontSize: 10, fontWeight: 700, color: "var(--ink-soft)", cursor: "pointer" }}>
+                    <div onClick={(e) => e.stopPropagation()} className="label-caps" style={{ color: "var(--ink-soft)", cursor: "pointer" }}>
                       +{overflow} more
                     </div>
                   </Popover>

@@ -60,7 +60,8 @@ export function AgendaView({ items, onTapItem }: Props) {
             padding: "8px 20px", fontSize: 12, fontWeight: 800, color: "var(--ink-soft)",
             borderBottom: "1px solid var(--border)",
           }}>
-            {dayjs(date).format("dddd, D MMMM")}{date === today ? " · Today" : ""}
+            {dayjs(date).format("dddd, D MMMM")}
+            {date === today && <span className="label-caps" style={{ color: "var(--accent)", marginLeft: 8 }}>Today</span>}
           </div>
           {dayItems.map((it, i) => {
             const color = eventColor(it.event, tokens);
@@ -76,7 +77,7 @@ export function AgendaView({ items, onTapItem }: Props) {
                   borderBottom: "1px solid var(--border)",
                 }}
               >
-                <div style={{ width: 56, flexShrink: 0, fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", fontVariantNumeric: "tabular-nums" }}>
+                <div style={{ width: 56, flexShrink: 0, fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", fontVariantNumeric: "tabular-nums" }}>
                   {it.event.allDay ? "All day" : it.time}
                 </div>
                 {it.event.isRoutine ? <TbFlame size={15} style={{ color, flexShrink: 0 }} />

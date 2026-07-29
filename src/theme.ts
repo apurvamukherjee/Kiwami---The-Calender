@@ -28,16 +28,16 @@ export function getTheme(mode: Mode): ThemeConfig {
       algorithm: antdTheme.darkAlgorithm,
       token: {
         ...shared,
-        colorPrimary: "#ff6b3d",
-        colorInfo: "#ff6b3d",
-        colorSuccess: "#37d67a",
+        colorPrimary: "#ff9f1c",
+        colorInfo: "#ff9f1c",
+        colorSuccess: "#4fdbcc",
         colorWarning: "#f6b93b",
-        colorError: "#ff5c7a",
-        colorBgLayout: "#0a0a0d",
-        colorBgContainer: "#16141a",
-        colorBgElevated: "#1c1920",
-        colorBorderSecondary: "#2a262e",
-        colorTextHeading: "#f3f1ee",
+        colorError: "#ffb4ab",
+        colorBgLayout: "#131313",
+        colorBgContainer: "#1c1b1b",
+        colorBgElevated: "#20201f",
+        colorBorderSecondary: "#544434",
+        colorTextHeading: "#e5e2e1",
       },
       components,
     };
@@ -64,7 +64,10 @@ export const ASH = "var(--ash)";
 
 // Concrete hexes for contexts where CSS vars can't resolve (box-shadow glow
 // intensities, canvas/SVG attrs). Keep in sync with index.css by hand.
+// `diamond` ("Forge Diamond") is reserved exclusively for streak-milestone
+// beads — never reused as a general accent, so a milestone reads as
+// unambiguously rare against the ember palette used everywhere else.
 export const TOKENS = {
-  light: { accent: "#d9631a", emberHot: "#ff8a3d", ash: "#c9c2ba", gold: "#b8860b", teal: "#12b3a1", danger: "#c8112a" },
-  dark: { accent: "#ff6b3d", emberHot: "#ffb15c", ash: "#4a464d", gold: "#f6b93b", teal: "#37d67a", danger: "#ff5c7a" },
+  light: { accent: "#d9631a", emberHot: "#ff8a3d", ash: "#c9c2ba", gold: "#b8860b", teal: "#12b3a1", diamond: "#1f8fa8", danger: "#c8112a", surfaceLowest: "#ffffff" },
+  dark: { accent: "#ff9f1c", emberHot: "#ffb86b", ash: "#353535", gold: "#f6b93b", teal: "#4fdbcc", diamond: "#90dceb", danger: "#ffb4ab", surfaceLowest: "#0e0e0e" },
 };

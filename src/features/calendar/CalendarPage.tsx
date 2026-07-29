@@ -142,6 +142,8 @@ export function CalendarPage() {
       <div style={{
         display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
         borderBottom: "1px solid var(--border)", flexWrap: "wrap", flexShrink: 0,
+        background: "var(--toolbar-bg)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+        position: "relative", zIndex: 10,
       }} className="safe-top">
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <Button size="small" onClick={() => setCurrentDate(todayKey())}>Today</Button>

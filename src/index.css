@@ -1,3 +1,12 @@
+/* Self-hosted "Ember & Ash" fonts — static woff2 only, zero CDN calls, so the
+   offline-first PWA guarantee (verified with the network fully disabled)
+   still holds. Only the weights actually used are imported. */
+@import "@fontsource/playfair-display/latin-600.css";
+@import "@fontsource/playfair-display/latin-700.css";
+@import "@fontsource/playfair-display/latin-900.css";
+@import "@fontsource/jetbrains-mono/latin-500.css";
+@import "@fontsource/jetbrains-mono/latin-700.css";
+
 :root {
   --bg: #f7f5f2;
   --surface: #ffffff;
@@ -8,27 +17,38 @@
   --ash: #c9c2ba;
   --gold: #b8860b;
   --teal: #12b3a1;
+  --diamond: #1f8fa8;
   --danger: #c8112a;
   --border: #e8e2da;
   --ember-glow: rgba(217, 99, 26, 0.35);
+  --font-display: "Playfair Display", serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --toolbar-bg: rgba(255, 255, 255, 0.82);
 }
 
 /* Dark is the default (data-theme is set on <html> before hydration —
-   see index.html's inline script) — warm near-black, not pure gothic black,
-   so the ember accent has room to read as genuinely warm against it. */
+   see index.html's inline script) — "Ember & Ash": obsidian surfaces as a
+   canvas for the ember/teal/diamond accents to visibly burn against.
+   Token values extracted from the Stitch-generated "Ember & Ash" design
+   system (see CLAUDE.md for provenance). */
 [data-theme="dark"] {
-  --bg: #0a0a0d;
-  --surface: #16141a;
-  --ink: #f3f1ee;
-  --ink-soft: #8f8a92;
-  --accent: #ff6b3d;
-  --ember-hot: #ffb15c;
-  --ash: #4a464d;
+  --bg: #131313;
+  --surface: #1c1b1b;
+  --ink: #e5e2e1;
+  --ink-soft: #dac2ae;
+  --accent: #ff9f1c;
+  --ember-hot: #ffb86b;
+  --ash: #353535;
   --gold: #f6b93b;
-  --teal: #37d67a;
-  --danger: #ff5c7a;
-  --border: #2a262e;
-  --ember-glow: rgba(255, 107, 61, 0.4);
+  --teal: #4fdbcc;
+  --diamond: #90dceb;
+  --danger: #ffb4ab;
+  --border: #544434;
+  --ember-glow: rgba(255, 159, 28, 0.4);
+  --surface-lowest: #0e0e0e;
+  --surface-high: #2a2a2a;
+  --surface-highest: #353535;
+  --toolbar-bg: rgba(19, 19, 19, 0.82);
 }
 
 * { box-sizing: border-box; }
@@ -64,6 +84,17 @@ input, textarea, [contenteditable="true"], .selectable {
 }
 
 .ant-modal-body { user-select: text; }
+
+/* Recurring micro-label pattern ("DAY STREAK", status tags): monospace,
+   uppercase, heavily tracked — the "System" half of the Ember & Ash
+   serif/mono pairing (see CLAUDE.md). */
+.label-caps {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
 
 /* Horizontal strips (view switcher, agenda date rail) that scroll on mobile
    without showing a scrollbar. */
@@ -103,16 +134,16 @@ input, textarea, [contenteditable="true"], .selectable {
   position: absolute; inset: 0; pointer-events: none;
   mix-blend-mode: screen;
 }
-.glitch::before { color: #ff6b3d; text-shadow: 2px 0 #ff6b3d; }
-.glitch::after  { color: #3ddce8; text-shadow: -2px 0 #3ddce8; }
+.glitch::before { color: #ff9f1c; text-shadow: 2px 0 #ff9f1c; }
+.glitch::after  { color: #90dceb; text-shadow: -2px 0 #90dceb; }
 .glitch.glitch-active { animation: glitch-jitter 180ms steps(5) infinite; }
 .glitch.glitch-active::before { animation: glitch-jitter 200ms steps(5) infinite, glitch-clip 200ms steps(5) infinite; }
 .glitch.glitch-active::after  { animation: glitch-jitter 160ms steps(5) reverse infinite, glitch-clip 220ms steps(5) reverse infinite; }
 
 /* Breathing amber glow — the "by Apurva" signature. */
 @keyframes signature-breathe {
-  0%, 100% { text-shadow: 0 0 6px rgba(255, 107, 61, 0.4), 0 0 12px rgba(255, 107, 61, 0.2); opacity: 0.85; }
-  50% { text-shadow: 0 0 12px rgba(255, 107, 61, 0.85), 0 0 24px rgba(255, 107, 61, 0.4); opacity: 1; }
+  0%, 100% { text-shadow: 0 0 6px rgba(255, 159, 28, 0.4), 0 0 12px rgba(255, 159, 28, 0.2); opacity: 0.85; }
+  50% { text-shadow: 0 0 12px rgba(255, 159, 28, 0.85), 0 0 24px rgba(255, 159, 28, 0.4); opacity: 1; }
 }
 .signature-glow { animation: signature-breathe 2.4s ease-in-out infinite; }
 
@@ -142,6 +173,11 @@ input, textarea, [contenteditable="true"], .selectable {
   100% { transform: translateY(-110vh) translateX(16px) scale(1); opacity: 0; }
 }
 .ember-spark { animation: ember-rise linear infinite; will-change: transform; }
+
+/* The Command Palette's "Floating Blade" — a border that's invisible until
+   the search input inside is focused, then lights up diamond-cyan. */
+.kiwami-blade .ant-modal-content { transition: border-color 0.25s ease; }
+.kiwami-blade:focus-within .ant-modal-content { border-color: var(--diamond) !important; }
 
 /* Bottom-sheet mode for Sheet.tsx (phone widths only — desktop uses a
    normal centered dialog). */
