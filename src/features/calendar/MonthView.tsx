@@ -1,0 +1,137 @@
+import { useMemo } from "react";
+import dayjs from "dayjs";
+import { Popover } from "antd";
+import { useTokens } from "../../hooks/useTokens";
+import { eventColor } from "./timeGrid";
+import type { CalendarItem } from "./useCalendarEvents";
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MAX_PILLS = 3;
+
+interface Props {
+  rangeStart: string;
+  rangeEnd: string;
+  currentDate: string;
+  items: CalendarItem[];
+  onTapItem: (item: CalendarItem) => void;
+  onSelectDay: (date: string) => void;
+}
+
+// Full-bleed grid filling all available width/height — a desktop calendar
+// surface, not a mobile card. Cells hold a fixed number of pills + a
+// "+N more" popover for overflow, same pattern Google Calendar uses.
+export function MonthView({ rangeStart, rangeEnd, currentDate, items, onTapItem, onSelectDay }: Props) {
+  const tokens = useTokens();
+
+  const days = useMemo(() => {
+    const out: string[] = [];
+    let d = dayjs(rangeStart);
+    const end = dayjs(rangeEnd);
+    while (!d.isAfter(end)) {
+      out.push(d.format("YYYY-MM-DD"));
+      d = d.add(1, "day");
+    }
+    return out;
+  }, [rangeStart, rangeEnd]);
+
+  const itemsByDate = useMemo(() => {
+    const map = new Map<string, CalendarItem[]>();
+    for (const it of items) {
+      const arr = map.get(it.date);
+      if (arr) arr.push(it);
+      else map.set(it.date, [it]);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
+    return map;
+  }, [items]);
+
+  const currentMonth = dayjs(currentDate).format("YYYY-MM");
+  const today = dayjs().format("YYYY-MM-DD");
+  const weekRows = days.length / 7;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: "1px solid var(--border)" }}>
+        {WEEKDAY_LABELS.map((label) => (
+          <div key={label} style={{ padding: "8px 10px", fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: 0.4 }}>
+            {label}
+          </div>
+        ))}
+      </div>
+      <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gridTemplateRows: `repeat(${weekRows}, 1fr)` }}>
+        {days.map((date) => {
+          const inMonth = date.slice(0, 7) === currentMonth;
+          const isToday = date === today;
+          const dayItems = itemsByDate.get(date) ?? [];
+          const visible = dayItems.slice(0, MAX_PILLS);
+          const overflow = dayItems.length - visible.length;
+          return (
+            <div
+              key={date}
+              onClick={() => onSelectDay(date)}
+              style={{
+                borderRight: "1px solid var(--border)", borderBottom: "1px solid var(--border)",
+                padding: 6, display: "flex", flexDirection: "column", gap: 3, cursor: "pointer",
+                opacity: inMonth ? 1 : 0.42,
+                background: isToday ? `${tokens.accent}12` : "transparent",
+                minHeight: 0, minWidth: 0, overflow: "hidden",
+              }}
+            >
+              <div style={{
+                width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12, fontWeight: 700, flexShrink: 0,
+                background: isToday ? "var(--accent)" : "transparent",
+                color: isToday ? "#fff" : "var(--ink)",
+              }}>
+                {dayjs(date).date()}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, minHeight: 0, overflow: "hidden" }}>
+                {visible.map((it, i) => {
+                  const color = eventColor(it.event, tokens);
+                  const missed = it.occurrenceStatus?.status === "missed";
+                  const done = it.occurrenceStatus?.status === "done";
+                  return (
+                    <div
+                      key={`${it.event.id}-${i}`}
+                      onClick={(e) => { e.stopPropagation(); onTapItem(it); }}
+                      style={{
+                        fontSize: 11, fontWeight: 600, padding: "1px 6px", borderRadius: 5,
+                        background: done || missed ? "var(--border)" : `${color}22`,
+                        color: done || missed ? "var(--ink-soft)" : color,
+                        textDecoration: missed ? "line-through" : "none",
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      }}
+                    >
+                      {it.time && <span style={{ opacity: 0.75 }}>{it.time} </span>}{it.event.title}
+                    </div>
+                  );
+                })}
+                {overflow > 0 && (
+                  <Popover
+                    trigger="click"
+                    content={
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 240 }}>
+                        {dayItems.map((it, i) => {
+                          const color = eventColor(it.event, tokens);
+                          return (
+                            <div key={i} onClick={() => onTapItem(it)} style={{ cursor: "pointer", fontSize: 12, fontWeight: 600, color }}>
+                              {it.time && <span style={{ opacity: 0.7, color: "var(--ink-soft)" }}>{it.time} </span>}{it.event.title}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    }
+                  >
+                    <div onClick={(e) => e.stopPropagation()} style={{ fontSize: 10, fontWeight: 700, color: "var(--ink-soft)", cursor: "pointer" }}>
+                      +{overflow} more
+                    </div>
+                  </Popover>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

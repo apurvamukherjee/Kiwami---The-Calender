@@ -1,0 +1,42 @@
+import Dexie, { type Table } from "dexie";
+import type { EventDto, RecurrenceRuleDto, OccurrenceStatusDto, SettingDto } from "./types";
+
+class KiwamiDB extends Dexie {
+  events!: Table<EventDto, number>;
+  recurrenceRules!: Table<RecurrenceRuleDto, number>;
+  occurrenceStatus!: Table<OccurrenceStatusDto, number>;
+  settings!: Table<SettingDto, string>;
+
+  constructor() {
+    super("kiwami");
+    // isRoutine/isFoodSlot are deliberately NOT indexed here: they're plain
+    // booleans, and boolean isn't a valid IndexedDB key type — an index on
+    // one would silently misbehave. Every read filters them in memory off
+    // `.toArray()` instead (fine at this app's scale, matches how
+    // useCalendarEvents already works).
+    this.version(1).stores({
+      events: "++id, ownerId, startTime",
+      recurrenceRules: "++id, &eventId",
+      occurrenceStatus: "++id, eventId, occurrenceDate, &[eventId+occurrenceDate]",
+      settings: "&key",
+    });
+  }
+}
+
+export const db = new KiwamiDB();
+
+export async function exportAll(): Promise<string> {
+  const data: Record<string, unknown> = { version: 1, exportedAt: new Date().toISOString() };
+  for (const t of db.tables) data[t.name] = await t.toArray();
+  return JSON.stringify(data, null, 2);
+}
+
+export async function importAll(json: string): Promise<void> {
+  const d = JSON.parse(json);
+  await db.transaction("rw", db.tables, async () => {
+    for (const t of db.tables) {
+      await t.clear();
+      if (Array.isArray(d[t.name])) await t.bulkAdd(d[t.name]);
+    }
+  });
+}

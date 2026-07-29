@@ -1,0 +1,150 @@
+:root {
+  --bg: #f7f5f2;
+  --surface: #ffffff;
+  --ink: #1c1a17;
+  --ink-soft: #6b655e;
+  --accent: #d9631a;
+  --ember-hot: #ff8a3d;
+  --ash: #c9c2ba;
+  --gold: #b8860b;
+  --teal: #12b3a1;
+  --danger: #c8112a;
+  --border: #e8e2da;
+  --ember-glow: rgba(217, 99, 26, 0.35);
+}
+
+/* Dark is the default (data-theme is set on <html> before hydration —
+   see index.html's inline script) — warm near-black, not pure gothic black,
+   so the ember accent has room to read as genuinely warm against it. */
+[data-theme="dark"] {
+  --bg: #0a0a0d;
+  --surface: #16141a;
+  --ink: #f3f1ee;
+  --ink-soft: #8f8a92;
+  --accent: #ff6b3d;
+  --ember-hot: #ffb15c;
+  --ash: #4a464d;
+  --gold: #f6b93b;
+  --teal: #37d67a;
+  --danger: #ff5c7a;
+  --border: #2a262e;
+  --ember-glow: rgba(255, 107, 61, 0.4);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth dark/light switch: animate color-family properties on theme change
+   instead of an instant token swap. Scoped to `.theme-ready` (added after
+   first paint in App.tsx) so the very first render doesn't fade in from
+   nothing. */
+html.theme-ready *, html.theme-ready *::before, html.theme-ready *::after {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease,
+    fill 0.3s ease, stroke 0.3s ease, box-shadow 0.3s ease;
+}
+
+h1, h2, h3, h4, .display {
+  font-family: Inter, sans-serif;
+  /* Tabular numerals kill horizontal jitter in the streak counter and date labels. */
+  font-variant-numeric: tabular-nums;
+}
+
+input, textarea, [contenteditable="true"], .selectable {
+  user-select: text;
+}
+
+.ant-modal-body { user-select: text; }
+
+/* Horizontal strips (view switcher, agenda date rail) that scroll on mobile
+   without showing a scrollbar. */
+.hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Respect notches/home-indicators on installed iOS/Android PWAs. */
+.safe-top { padding-top: env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+/* -----------------------------------------------------------------------
+   SPLASH — glitch / scanline / breathing glow / rising embers
+   Used only by components/SplashScreen.tsx. Always renders on a fixed dark
+   vignette regardless of the app's light/dark setting (same call Zenith's
+   splash makes) — it's a short cinematic beat, not a themed surface.
+   ----------------------------------------------------------------------- */
+
+/* RGB-split glitch: two extra copies of the wordmark, offset + color-shifted,
+   jitter/clip in tight bursts. Only animates while .glitch-active is set. */
+@keyframes glitch-jitter {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-2px, 1px); }
+  40% { transform: translate(2px, -1px); }
+  60% { transform: translate(-1px, 2px); }
+  80% { transform: translate(1px, -2px); }
+}
+@keyframes glitch-clip {
+  0%, 100% { clip-path: inset(0 0 0 0); }
+  20% { clip-path: inset(20% 0 60% 0); }
+  40% { clip-path: inset(60% 0 20% 0); }
+  60% { clip-path: inset(35% 0 45% 0); }
+  80% { clip-path: inset(75% 0 5% 0); }
+}
+.glitch { position: relative; display: inline-block; }
+.glitch::before, .glitch::after {
+  content: attr(data-text);
+  position: absolute; inset: 0; pointer-events: none;
+  mix-blend-mode: screen;
+}
+.glitch::before { color: #ff6b3d; text-shadow: 2px 0 #ff6b3d; }
+.glitch::after  { color: #3ddce8; text-shadow: -2px 0 #3ddce8; }
+.glitch.glitch-active { animation: glitch-jitter 180ms steps(5) infinite; }
+.glitch.glitch-active::before { animation: glitch-jitter 200ms steps(5) infinite, glitch-clip 200ms steps(5) infinite; }
+.glitch.glitch-active::after  { animation: glitch-jitter 160ms steps(5) reverse infinite, glitch-clip 220ms steps(5) reverse infinite; }
+
+/* Breathing amber glow — the "by Apurva" signature. */
+@keyframes signature-breathe {
+  0%, 100% { text-shadow: 0 0 6px rgba(255, 107, 61, 0.4), 0 0 12px rgba(255, 107, 61, 0.2); opacity: 0.85; }
+  50% { text-shadow: 0 0 12px rgba(255, 107, 61, 0.85), 0 0 24px rgba(255, 107, 61, 0.4); opacity: 1; }
+}
+.signature-glow { animation: signature-breathe 2.4s ease-in-out infinite; }
+
+/* Horizontal scanline sweep under the wordmark — a single ember line that
+   traverses once, left to right. */
+@keyframes scan-sweep {
+  0% { transform: translateX(-100%); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+.scan-line { animation: scan-sweep 2.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+/* Vignette wrapper — dims the edges so the eye stays on the mark. */
+.ember-vignette { position: relative; }
+.ember-vignette::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 0%, transparent 45%, rgba(0,0,0,0.75) 100%);
+}
+
+/* Rising embers — small amber sparks drifting upward and fading, the inverse
+   of a falling-ash effect: this app's mark is about a lit chain, not decay. */
+@keyframes ember-rise {
+  0% { transform: translateY(10vh) translateX(0) scale(0.6); opacity: 0; }
+  10% { opacity: 0.7; }
+  90% { opacity: 0.4; }
+  100% { transform: translateY(-110vh) translateX(16px) scale(1); opacity: 0; }
+}
+.ember-spark { animation: ember-rise linear infinite; will-change: transform; }
+
+/* Bottom-sheet mode for Sheet.tsx (phone widths only — desktop uses a
+   normal centered dialog). */
+.kiwami-bottom-sheet.ant-modal-wrap { align-items: flex-end; padding: 0; }
+.kiwami-bottom-sheet .ant-modal { top: auto; padding: 0; max-width: 100vw; margin: 0; width: 100vw !important; }
+.kiwami-bottom-sheet .ant-modal-content { width: 100vw; box-sizing: border-box; }

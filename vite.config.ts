@@ -1,0 +1,55 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
+
+export default defineConfig({
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: "autoUpdate",
+      includeAssets: ["favicon-32.png", "apple-touch-icon.png"],
+      manifest: {
+        id: "/",
+        name: "Kiwami",
+        short_name: "Kiwami",
+        description: "Calendar, routines, and food-time tracking — offline-first.",
+        start_url: "/",
+        display: "standalone",
+        orientation: "portrait",
+        scope: "/",
+        background_color: "#0a0a0d",
+        theme_color: "#0a0a0d",
+        icons: [
+          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-maskable-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+          { src: "/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        ],
+      },
+      workbox: {
+        // Dexie is the source of truth and needs no caching; this just makes
+        // the app shell + static assets available with zero network.
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest}"],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.hostname.endsWith("convex.cloud"),
+            handler: "NetworkOnly",
+          },
+        ],
+      },
+    }),
+  ],
+  server: { host: true, port: 5173 },
+  build: {
+    target: ["es2019", "safari14", "chrome80", "firefox78", "edge88"],
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom"],
+          antd: ["antd"],
+          motion: ["framer-motion"],
+        },
+      },
+    },
+  },
+});
