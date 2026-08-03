@@ -165,13 +165,6 @@ UI (features/*/*.tsx)        ← presentational only, never touches Dexie direct
        └─ db (src/db/db.ts)  ← typed tables, export/import
 ```
 
-A recurring event is one row — occurrences are expanded on demand by a pure,
-unit-tested function, not materialized per-date until something actually
-needs to track completion (a routine or food slot). Full technical detail,
-data-flow walkthrough, and the future Convex-sync path:
-[`ARCHITECTURE.md`](./ARCHITECTURE.md). Complete project context (directory
-map, every convention, known trade-offs): [`CLAUDE.md`](./CLAUDE.md).
-
 ## 🔒 Privacy
 
 100% on-device. No analytics, no account, no network required to use any
