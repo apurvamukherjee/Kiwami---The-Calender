@@ -53,3 +53,23 @@ export interface SettingDto {
   key: string;
   value: string | number;
 }
+
+export type NoteKind = "note" | "task" | "reminder";
+
+export interface NoteDto {
+  id?: number;
+  ownerId: string;
+  kind: NoteKind;
+  title: string; // display text — the parsed date phrase is stripped out of rawText to build this
+  rawText: string; // exactly what was typed — restored into the composer on edit
+  description?: string;
+  dueDate?: string; // ISO datetime; task/reminder only
+  allDay?: boolean; // true when only a date (no time) was set/parsed
+  location?: string;
+  links?: string[]; // regex-extracted from rawText + manually added
+  completed?: boolean; // task/reminder — reminder uses it as "dismissed" so it stops showing in the due list
+  completedAt?: number;
+  notifiedAt?: number; // reminder only — guards re-firing the same reminder on every sweep tick
+  createdAt: number;
+  updatedAt: number;
+}

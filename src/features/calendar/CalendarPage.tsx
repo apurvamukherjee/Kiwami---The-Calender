@@ -7,6 +7,11 @@ import { db } from "../../db/db";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { SettingsSheet } from "../../components/SettingsSheet";
 import { CommandPalette } from "../../components/CommandPalette";
+import { SectionTabs } from "../../components/SectionTabs";
+import type { Section } from "../../components/BottomNav";
+import { useNotesForRange } from "../../lib/notes";
+import { NoteEditorSheet } from "../notes/NoteEditorSheet";
+import type { NoteDto } from "../../db/types";
 import { useCalendarRange, type CalendarView } from "./useCalendarRange";
 import { useCalendarEvents, type CalendarItem } from "./useCalendarEvents";
 import { MonthView } from "./MonthView";
@@ -30,15 +35,21 @@ const MOBILE_VIEWS = [
   { label: "Agenda", value: "agenda" },
 ];
 
+interface Props {
+  section: Section;
+  onChangeSection: (s: Section) => void;
+}
+
 // Full-width desktop calendar shell (toolbar + active view filling the rest
 // of the viewport) that collapses to Day+Agenda only below the mobile
 // breakpoint — not a phone card scaled up, a real responsive app shell.
-export function CalendarPage() {
+export function CalendarPage({ section, onChangeSection }: Props) {
   const isMobile = useIsMobile();
   const [view, setView] = useState<CalendarView>("month");
   const [currentDate, setCurrentDate] = useState(todayKey());
   const { rangeStart, rangeEnd } = useCalendarRange(view, currentDate);
   const items = useCalendarEvents(rangeStart, rangeEnd);
+  const notes = useNotesForRange(rangeStart, rangeEnd);
   const eventCount = useLiveQuery(() => db.events.count(), []);
   const showEmptyState = eventCount === 0;
 
@@ -52,12 +63,14 @@ export function CalendarPage() {
   const [foodItem, setFoodItem] = useState<CalendarItem | null>(null);
   const [yearHeatmapOpen, setYearHeatmapOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [noteEditorOpen, setNoteEditorOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<NoteDto | null>(null);
 
   useEffect(() => {
     if (isMobile && (view === "month" || view === "week")) setView("day");
   }, [isMobile, view]);
 
-  const anySheetOpen = editorOpen || routineSheetOpen || foodSheetOpen || settingsOpen;
+  const anySheetOpen = editorOpen || routineSheetOpen || foodSheetOpen || settingsOpen || noteEditorOpen;
 
   // Arrow-key date nav + "T" for Today — skipped while typing anywhere or
   // while a sheet is open, so it never fights with form inputs.
@@ -136,15 +149,20 @@ export function CalendarPage() {
     setCurrentDate(date);
     setView("day");
   }
+  function openNote(note: NoteDto) {
+    setEditingNote(note);
+    setNoteEditorOpen(true);
+  }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
       <div style={{
         display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
         borderBottom: "1px solid var(--border)", flexWrap: "wrap", flexShrink: 0,
         background: "var(--toolbar-bg)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
         position: "relative", zIndex: 10,
       }} className="safe-top">
+        {!isMobile && <SectionTabs section={section} onChange={onChangeSection} />}
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <Button size="small" onClick={() => setCurrentDate(todayKey())}>Today</Button>
           <Button size="small" type="text" icon={<TbChevronLeft size={16} />} onClick={() => step(-1)} aria-label="Previous period" />
@@ -194,7 +212,7 @@ export function CalendarPage() {
         )}
         {view === "month" && (
           <MonthView rangeStart={rangeStart} rangeEnd={rangeEnd} currentDate={currentDate}
-            items={items} onTapItem={openEdit} onSelectDay={selectDay} />
+            items={items} notes={notes} onTapItem={openEdit} onTapNote={openNote} onSelectDay={selectDay} />
         )}
         {view === "week" && (
           <WeekView rangeStart={rangeStart} items={items} onTapItem={openEdit}
@@ -204,7 +222,7 @@ export function CalendarPage() {
           <DayView date={currentDate} items={items} onTapItem={openEdit}
             onCreateAt={(d, t, e) => openCreate(d, t, e)} />
         )}
-        {view === "agenda" && <AgendaView items={items} onTapItem={openEdit} />}
+        {view === "agenda" && <AgendaView items={items} notes={notes} onTapItem={openEdit} onTapNote={openNote} />}
       </div>
 
       <EventEditorSheet
@@ -229,6 +247,7 @@ export function CalendarPage() {
       />
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <YearHeatmapSheet open={yearHeatmapOpen} onClose={() => setYearHeatmapOpen(false)} />
+      <NoteEditorSheet open={noteEditorOpen} onClose={() => setNoteEditorOpen(false)} note={editingNote} />
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}

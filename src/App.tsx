@@ -4,12 +4,35 @@ import { AnimatePresence } from "framer-motion";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { getTheme } from "./theme";
 import { useThemeMode } from "./hooks/useThemeMode";
+import { useIsMobile } from "./hooks/useIsMobile";
 import { SplashScreen } from "./components/SplashScreen";
 import { InstallPrompt } from "./components/InstallPrompt";
+import { BottomNav, type Section } from "./components/BottomNav";
 import { CalendarPage } from "./features/calendar/CalendarPage";
+import { NotesPage } from "./features/notes/NotesPage";
 import { resolveOverdueOccurrences } from "./lib/occurrences";
+import { checkDueReminders } from "./lib/notifications";
 
 const SPLASH_SEEN_KEY = "kiwami-splash-seen";
+const REMINDER_SWEEP_INTERVAL_MS = 60_000;
+
+// Runs the reminder sweep on an interval — a separate child of <AntApp>
+// (not inline in App()) because the in-app notification fallback needs
+// App.useApp(), which only resolves inside AntApp's own subtree.
+function ReminderSweeper() {
+  const { notification } = AntApp.useApp();
+  useEffect(() => {
+    function sweep() {
+      void checkDueReminders((r) => {
+        notification.info({ message: "Reminder", description: r.title, placement: "top" });
+      });
+    }
+    void sweep();
+    const interval = setInterval(sweep, REMINDER_SWEEP_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [notification]);
+  return null;
+}
 
 export default function App() {
   // Plays once per browser session (sessionStorage, not localStorage — a
@@ -17,6 +40,8 @@ export default function App() {
   // reload/navigation within the same session shouldn't replay it).
   const [ready, setReady] = useState(() => sessionStorage.getItem(SPLASH_SEEN_KEY) === "1");
   const [mode] = useThemeMode();
+  const [section, setSection] = useState<Section>("calendar");
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", mode);
@@ -54,7 +79,15 @@ export default function App() {
             }} />
           )}
         </AnimatePresence>
-        <CalendarPage />
+        <ReminderSweeper />
+        <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100%" }}>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            {section === "calendar"
+              ? <CalendarPage section={section} onChangeSection={setSection} />
+              : <NotesPage section={section} onChangeSection={setSection} />}
+          </div>
+          {isMobile && <BottomNav section={section} onChange={setSection} />}
+        </div>
         <InstallPrompt />
         {needRefresh && (
           <div style={{

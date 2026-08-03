@@ -16,10 +16,12 @@ Signature: **Kiwami** · tagline **"Own your days"** · signature **"by Apurva"*
 
 ## Stack
 
-React 19 + TypeScript (strict) + Vite 5 + Ant Design 5 + Dexie (IndexedDB v1)
+React 19 + TypeScript (strict) + Vite 5 + Ant Design 5 + Dexie (IndexedDB v2)
 + Framer Motion + `react-icons/tb` (Tabler, zero `@ant-design/icons`) + dayjs
-+ `vite-plugin-pwa` + optional Convex (schema only, sync deferred). No
-router — single-page, local view state. `vitest` for unit tests.
++ `chrono-node` (offline NLP date/time parsing, Notes composer) +
+`vite-plugin-pwa` + optional Convex (schema only, sync deferred). No
+router — two top-level sections (Calendar/Notes) toggled by local state, not
+a route. `vitest` for unit tests.
 
 ## Run / build / test
 
@@ -104,6 +106,19 @@ src/
       FoodSlotSettings.tsx    Add/rename/retime/remove, rendered inside SettingsSheet
       FoodLogSheet.tsx        Lightweight Ate/Skipped log (no streak — food isn't tracked
                               as a streak per spec)
+    notes/                    See "Phase 4 — Notes/Tasks/Reminders" below
+      NotesPage.tsx           The app shell for the Notes section: toolbar (SectionTabs on
+                              desktop, kind filter, Timeline/All switch) + NoteComposer +
+                              active list
+      NoteComposer.tsx        Sticky quick-entry bar — live chrono-node parsing as you type
+      NoteEditorSheet.tsx     Edit/delete an existing note/task/reminder
+      NoteListItem.tsx        One row, shared by NotesPage's lists and the Calendar
+                              Agenda-view overlay
+  components/
+    BottomNav.tsx             Mobile-only 2-tab (Calendar/Notes) bar — a normal flex child
+                              in App.tsx, not position:fixed (see Phase 4)
+    SectionTabs.tsx           Desktop-only Calendar/Notes Segmented, dropped into each
+                              page's own toolbar
 public/icons/, favicon-32.png, apple-touch-icon.png   Procedurally generated placeholder
                               PNGs (solid ember-colored ring motif) — replace with real
                               branding before shipping anywhere public.
@@ -363,3 +378,63 @@ The Command Palette got the same blur treatment plus a border that's
 transparent until the search input gains focus, then lights up
 `var(--diamond)` via a `.kiwami-blade:focus-within` CSS rule (no extra
 React state needed).
+
+## Phase 4 — Notes/Tasks/Reminders + 2-tab nav (2026-08-03)
+
+Kiwami became a two-section app: a **Calendar** section (everything above)
+and a new **Notes** section for freeform Notes/Tasks/Reminders, switched via
+`App.tsx`'s `section` state — `BottomNav` (mobile) or `SectionTabs` (desktop,
+dropped into each page's own toolbar). `App.tsx`'s root div changed from
+`height: 100dvh` to a real flex column (`BottomNav` as a normal flex child,
+not `position: fixed`) so no page needs manual bottom-padding math; both
+`CalendarPage` and `NotesPage` fill `height: 100%` of that flex slot instead
+of the raw viewport now.
+
+**Data model**: `db/types.ts`'s `NoteDto`/`NoteKind` (`"note" | "task" |
+"reminder"`), a new Dexie `notes` table (`db.ts` version 2, purely additive —
+no `upgrade()` needed). `kind` is a string enum, safely indexable — unlike
+the `isRoutine`/`isFoodSlot` boolean gotcha documented above. `lib/notes.ts`
+mirrors `lib/events.ts`'s CRUD-function/live-query-hook shape exactly.
+
+**NLP date/time parsing** (`lib/parseNoteText.ts`, unit-tested): the Notes
+composer live-parses whatever you type via `chrono-node` — fully offline, no
+network call, matching the "100% local" privacy story. Only date/time is
+auto-recognized; **location is a manual field, not parsed from prose** —
+there's no reliable offline signal for "this is a place" without a geocoding
+API call. Links are auto-extracted via a plain URL regex and left inline in
+the title (stripping them would look like data loss); only the matched
+date/time phrase is stripped. First concrete date only — "every Monday"
+isn't expanded into a rule; reusing the events/recurrenceRules engine for
+notes was scoped out as a materially bigger lift than this pass.
+
+**Reminders are foreground-only.** `lib/notifications.ts`'s `checkDueReminders()`
+runs on app mount and a 60s interval (`App.tsx`'s `ReminderSweeper`, a
+separate child of `<AntApp>` since the in-app-toast fallback needs
+`App.useApp()`, which only resolves inside `AntApp`'s own subtree — calling
+it directly in the `App` component doesn't work). This fires a real
+`Notification` when permission is granted, or an antd toast fallback
+otherwise, then stamps `notifiedAt` so it doesn't re-fire — same "catch up
+the moment a human opens the app" honesty as `resolveOverdueOccurrences()`.
+**A reminder that fires with the app/phone fully closed needs Web Push +
+VAPID + a server to trigger it at the right time** — Kiwami has no backend
+wired up (Convex is schema-only, no functions), so that's an explicit future
+phase, not this one. Permission is requested lazily, the first time a
+Reminder is actually saved — not on app load.
+
+**Calendar integration**: dated Tasks/Reminders show up in the Calendar
+section too (Agenda + Month only — Week/Day's hourly grid placement for an
+all-day task is a real layout question, left as a v1.1 follow-up), via a
+separate `useNotesForRange` live query passed into `MonthView`/`AgendaView`
+as its own prop — deliberately **not** merged into `useCalendarEvents.ts`'s
+`CalendarItem` pipeline, which has 12+18 passing unit tests riding on it.
+Month gets a small teal dot badge (`Popover` listing that day's notes,
+same pattern as the existing "+N more" event overflow); Agenda interleaves
+`NoteListItem` rows into its existing per-day groups, tapping either opens
+`NoteEditorSheet` instead of `EventEditorSheet`.
+
+**Verified**: `npm run typecheck`/`test` (23 tests, up from 18)/`build` all
+clean; a real headless-Chromium pass (Playwright, same globally-installed
+copy used in earlier phases) at both 390px and 1440px confirmed the nav
+switch, live NLP chip preview, Timeline day-grouping, the Month-view dot
+badge, and the Agenda-view overlay all render correctly with zero console
+errors.

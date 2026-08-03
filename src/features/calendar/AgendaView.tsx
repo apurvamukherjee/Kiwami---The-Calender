@@ -6,7 +6,9 @@ import { todayKey } from "../../lib/date.utils";
 import { eventColor } from "./timeGrid";
 import { EmberChain } from "../../components/EmberChain";
 import { useRecentBeads } from "../routines/useRoutineStreak";
+import { NoteListItem } from "../notes/NoteListItem";
 import type { CalendarItem } from "./useCalendarEvents";
+import type { NoteDto } from "../../db/types";
 
 const AGENDA_CHAIN_DAYS = 7;
 
@@ -21,15 +23,34 @@ function RoutineChainBadge({ eventId }: { eventId: number | undefined }) {
 
 interface Props {
   items: CalendarItem[];
+  notes: NoteDto[];
   onTapItem: (item: CalendarItem) => void;
+  onTapNote: (note: NoteDto) => void;
 }
 
 // Chronological list grouped by day. Days with nothing on them are skipped
 // entirely (matches how every mainstream agenda view behaves) rather than
-// rendering an empty header for every date in the window.
-export function AgendaView({ items, onTapItem }: Props) {
+// rendering an empty header for every date in the window. Dated
+// Tasks/Reminders from the Notes tab are interleaved into the same day
+// groups (rendered via NoteListItem, a dashed-border look distinct from a
+// real event's solid color bar) so Agenda stays the one place to see
+// everything happening on a given day.
+export function AgendaView({ items, notes, onTapItem, onTapNote }: Props) {
   const tokens = useTokens();
   const today = todayKey();
+
+  const notesByDate = useMemo(() => {
+    const map = new Map<string, NoteDto[]>();
+    for (const n of notes) {
+      if (!n.dueDate) continue;
+      const key = n.dueDate.slice(0, 10);
+      const arr = map.get(key);
+      if (arr) arr.push(n);
+      else map.set(key, [n]);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""));
+    return map;
+  }, [notes]);
 
   const groups = useMemo(() => {
     const map = new Map<string, CalendarItem[]>();
@@ -38,10 +59,11 @@ export function AgendaView({ items, onTapItem }: Props) {
       if (arr) arr.push(it);
       else map.set(it.date, [it]);
     }
-    return [...map.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, dayItems]) => [date, [...dayItems].sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""))] as const);
-  }, [items]);
+    const dates = new Set([...map.keys(), ...notesByDate.keys()]);
+    return [...dates]
+      .sort((a, b) => a.localeCompare(b))
+      .map((date) => [date, [...(map.get(date) ?? [])].sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""))] as const);
+  }, [items, notesByDate]);
 
   if (groups.length === 0) {
     return (
@@ -98,6 +120,9 @@ export function AgendaView({ items, onTapItem }: Props) {
               </div>
             );
           })}
+          {(notesByDate.get(date) ?? []).map((n) => (
+            <NoteListItem key={n.id} note={n} onTap={onTapNote} dateFormat="time" />
+          ))}
         </div>
       ))}
     </div>

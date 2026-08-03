@@ -1,26 +1,31 @@
 import { useMemo } from "react";
 import dayjs from "dayjs";
 import { Popover } from "antd";
+import { TbNote, TbListCheck, TbBell } from "react-icons/tb";
 import { useTokens } from "../../hooks/useTokens";
 import { eventColor } from "./timeGrid";
 import type { CalendarItem } from "./useCalendarEvents";
+import type { NoteDto } from "../../db/types";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MAX_PILLS = 3;
+const NOTE_KIND_ICON = { note: TbNote, task: TbListCheck, reminder: TbBell };
 
 interface Props {
   rangeStart: string;
   rangeEnd: string;
   currentDate: string;
   items: CalendarItem[];
+  notes: NoteDto[];
   onTapItem: (item: CalendarItem) => void;
+  onTapNote: (note: NoteDto) => void;
   onSelectDay: (date: string) => void;
 }
 
 // Full-bleed grid filling all available width/height — a desktop calendar
 // surface, not a mobile card. Cells hold a fixed number of pills + a
 // "+N more" popover for overflow, same pattern Google Calendar uses.
-export function MonthView({ rangeStart, rangeEnd, currentDate, items, onTapItem, onSelectDay }: Props) {
+export function MonthView({ rangeStart, rangeEnd, currentDate, items, notes, onTapItem, onTapNote, onSelectDay }: Props) {
   const tokens = useTokens();
 
   const days = useMemo(() => {
@@ -45,6 +50,18 @@ export function MonthView({ rangeStart, rangeEnd, currentDate, items, onTapItem,
     return map;
   }, [items]);
 
+  const notesByDate = useMemo(() => {
+    const map = new Map<string, NoteDto[]>();
+    for (const n of notes) {
+      if (!n.dueDate) continue;
+      const key = n.dueDate.slice(0, 10);
+      const arr = map.get(key);
+      if (arr) arr.push(n);
+      else map.set(key, [n]);
+    }
+    return map;
+  }, [notes]);
+
   const currentMonth = dayjs(currentDate).format("YYYY-MM");
   const today = dayjs().format("YYYY-MM-DD");
   const weekRows = days.length / 7;
@@ -65,6 +82,7 @@ export function MonthView({ rangeStart, rangeEnd, currentDate, items, onTapItem,
           const dayItems = itemsByDate.get(date) ?? [];
           const visible = dayItems.slice(0, MAX_PILLS);
           const overflow = dayItems.length - visible.length;
+          const dayNotes = notesByDate.get(date) ?? [];
           return (
             <div
               key={date}
@@ -84,6 +102,33 @@ export function MonthView({ rangeStart, rangeEnd, currentDate, items, onTapItem,
                   background: `radial-gradient(circle, ${tokens.accent}30, transparent 70%)`,
                   filter: "blur(14px)", pointerEvents: "none",
                 }} />
+              )}
+              {dayNotes.length > 0 && (
+                <Popover
+                  trigger="click"
+                  content={
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 240 }}>
+                      {dayNotes.map((n) => {
+                        const Icon = NOTE_KIND_ICON[n.kind];
+                        return (
+                          <div key={n.id} onClick={() => onTapNote(n)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}>
+                            <Icon size={12} style={{ flexShrink: 0, color: "var(--ink-soft)" }} />
+                            {n.title}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  }
+                >
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      position: "absolute", top: 6, right: 6, width: 7, height: 7, borderRadius: "50%",
+                      background: "var(--teal)", cursor: "pointer", zIndex: 1,
+                    }}
+                    aria-label={`${dayNotes.length} note${dayNotes.length > 1 ? "s" : ""}`}
+                  />
+                </Popover>
               )}
               <div style={{
                 width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",

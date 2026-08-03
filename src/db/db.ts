@@ -1,11 +1,12 @@
 import Dexie, { type Table } from "dexie";
-import type { EventDto, RecurrenceRuleDto, OccurrenceStatusDto, SettingDto } from "./types";
+import type { EventDto, RecurrenceRuleDto, OccurrenceStatusDto, SettingDto, NoteDto } from "./types";
 
 class KiwamiDB extends Dexie {
   events!: Table<EventDto, number>;
   recurrenceRules!: Table<RecurrenceRuleDto, number>;
   occurrenceStatus!: Table<OccurrenceStatusDto, number>;
   settings!: Table<SettingDto, string>;
+  notes!: Table<NoteDto, number>;
 
   constructor() {
     super("kiwami");
@@ -19,6 +20,17 @@ class KiwamiDB extends Dexie {
       recurrenceRules: "++id, &eventId",
       occurrenceStatus: "++id, eventId, occurrenceDate, &[eventId+occurrenceDate]",
       settings: "&key",
+    });
+    // v2: adds `notes` (Notes/Tasks/Reminders). Purely additive — no
+    // upgrade() needed since no existing table's shape changes. `kind` is a
+    // string enum (not a boolean), so — unlike isRoutine/isFoodSlot above —
+    // it's safe to index directly.
+    this.version(2).stores({
+      events: "++id, ownerId, startTime",
+      recurrenceRules: "++id, &eventId",
+      occurrenceStatus: "++id, eventId, occurrenceDate, &[eventId+occurrenceDate]",
+      settings: "&key",
+      notes: "++id, ownerId, kind, dueDate",
     });
   }
 }
