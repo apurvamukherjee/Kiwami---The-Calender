@@ -54,15 +54,80 @@ export interface SettingDto {
   value: string | number;
 }
 
+export type TaskPriority = "none" | "low" | "medium" | "high" | "urgent";
+
+export interface TaskSubtaskDto {
+  id: string; // crypto.randomUUID() — inline, not a Dexie row
+  title: string;
+  done: boolean;
+}
+
+// Same shape as RecurrenceRuleDto minus id/eventId — deliberately NOT stored in the
+// shared recurrenceRules table (expandOccurrences() never reads eventId/id, so this
+// is safely reusable as a plain embedded object with zero risk to that table/its tests).
+export interface TaskRecurrenceDto {
+  type: RecurrenceType;
+  weekdays?: number[];
+  dayOfMonth?: number;
+  interval?: number;
+  customUnit?: "day" | "week";
+  endDate?: string | null;
+  excludedDates: string[]; // always [] in Stage 1 — no per-occurrence delete UI for tasks
+}
+
+export interface TaskListDto {
+  id?: number;
+  ownerId: string;
+  name: string;
+  color?: string;
+  order: number;
+  archived?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface TaskTagDto {
+  id?: number;
+  ownerId: string;
+  name: string;
+  color: string; // hex — from useTokens() swatches, never `diamond` (reserved for streak milestones)
+  createdAt: number;
+}
+
+export interface TaskDto {
+  id?: number;
+  ownerId: string;
+  listId: number;
+  title: string;
+  description?: string;
+  order: number; // integer position within its list
+  priority: TaskPriority;
+  tagIds: number[];
+  subtasks: TaskSubtaskDto[];
+  dueDate?: string; // ISO local datetime, date.utils.ts shape
+  allDay?: boolean;
+  recurrence?: TaskRecurrenceDto | null;
+  completed: boolean;
+  completedAt?: number;
+  // Stamped on every completion, including a recurring roll-forward — the sole input
+  // to the optional "N done today" indicator. Deliberately not a streak.
+  lastCompletedAt?: number;
+  archived: boolean; // the primary destructive action's target, not hard delete
+  archivedAt?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export type NoteKind = "note" | "task" | "reminder";
 
 export interface NoteDto {
   id?: number;
   ownerId: string;
   kind: NoteKind;
-  title: string; // display text — the parsed date phrase is stripped out of rawText to build this
-  rawText: string; // exactly what was typed — restored into the composer on edit
-  description?: string;
+  title: string; // display text — for kind "note" this is the rich body's first line; otherwise the parsed date phrase stripped out of rawText
+  rawText: string; // exactly what was typed — restored into the composer on edit. Unused once a "note" has a body (rawText was only ever its first draft).
+  description?: string; // task/reminder only — the "note" kind's long-form content lives in `body` instead
+  body?: string; // kind "note" only — Tiptap HTML, edited full-screen in NoteFullEditor
   dueDate?: string; // ISO datetime; task/reminder only
   allDay?: boolean; // true when only a date (no time) was set/parsed
   location?: string;

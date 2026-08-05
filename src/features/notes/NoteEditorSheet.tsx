@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Segmented, Switch, Popconfirm, App, Tag } from "antd";
 import dayjs from "dayjs";
-import { TbTrash, TbNote, TbListCheck, TbBell, TbMapPin, TbLink, TbPlus } from "react-icons/tb";
+import { TbTrash, TbListCheck, TbBell, TbMapPin, TbLink, TbPlus } from "react-icons/tb";
 import { Sheet } from "../../components/Sheet";
 import { TimeSelect } from "../../components/TimeSelect";
 import { useBackClose } from "../../hooks/useBackClose";
@@ -10,8 +10,10 @@ import { combineDateTime, todayKey } from "../../lib/date.utils";
 import { hapticLight, hapticSuccess } from "../../lib/haptics";
 import type { NoteDto, NoteKind } from "../../db/types";
 
+// Task/Reminder only — a plain "note" is edited full-screen in
+// NoteFullEditor instead (see NotesPage.tsx/CalendarPage.tsx's routing by
+// kind), so this sheet never offers switching into it.
 const KIND_OPTIONS = [
-  { label: <span style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}><TbNote size={13} /> Note</span>, value: "note" },
   { label: <span style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}><TbListCheck size={13} /> Task</span>, value: "task" },
   { label: <span style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}><TbBell size={13} /> Reminder</span>, value: "reminder" },
 ];

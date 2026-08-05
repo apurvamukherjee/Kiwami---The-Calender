@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 import { Checkbox } from "antd";
 import { TbNote, TbListCheck, TbBell, TbMapPin, TbLink } from "react-icons/tb";
-import { toggleTaskComplete } from "../../lib/notes";
+import { toggleTaskComplete, htmlToPlainText } from "../../lib/notes";
 import { hapticLight } from "../../lib/haptics";
 import type { NoteDto } from "../../db/types";
 
@@ -16,14 +16,49 @@ interface Props {
   dateFormat?: "time" | "full";
 }
 
-// One row, reused by NotesPage's Timeline/All lists and the Calendar
-// Agenda-view overlay — mirrors AgendaView.tsx's row shape (icon, title,
-// secondary location line) but with a real checkbox instead of a status dot,
-// since a task/reminder is a direct tap-to-toggle, not a streak-critical
-// explicit Done/Missed action.
-export function NoteListItem({ note, onTap, dateFormat = "time" }: Props) {
+// Dispatches to a distinct card look for plain Notes (Apple Notes' gallery
+// list — title + body snippet, no checkbox, tap opens the full-screen rich
+// editor) vs. the compact checkbox row every Task/Reminder uses.
+export function NoteListItem(props: Props) {
+  return props.note.kind === "note" ? <NoteCardRow {...props} /> : <ActionRow {...props} />;
+}
+
+function NoteCardRow({ note, onTap }: Props) {
+  const preview = note.body ? htmlToPlainText(note.body) : note.description ?? "";
+  return (
+    <div
+      onClick={() => onTap(note)}
+      style={{
+        margin: "8px 16px", padding: "12px 14px", cursor: "pointer",
+        background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {note.title || "New note"}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--ink-soft)", flexShrink: 0, fontFamily: "var(--font-mono)" }}>
+          {dayjs(note.updatedAt).format("D MMM")}
+        </div>
+      </div>
+      {preview && (
+        <div style={{
+          fontSize: 12, color: "var(--ink-soft)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis",
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+        }}>
+          {preview}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The compact tap-to-toggle row every Task/Reminder uses — mirrors
+// AgendaView.tsx's row shape (icon, title, secondary location line) but with
+// a real checkbox instead of a status dot, since a task/reminder is a direct
+// tap-to-toggle, not a streak-critical explicit Done/Missed action.
+function ActionRow({ note, onTap, dateFormat = "time" }: Props) {
   const Icon = KIND_ICON[note.kind];
-  const dismissible = note.kind === "task" || note.kind === "reminder";
   const done = !!note.completed;
 
   return (
@@ -34,20 +69,16 @@ export function NoteListItem({ note, onTap, dateFormat = "time" }: Props) {
         borderBottom: "1px solid var(--border)", opacity: done ? 0.55 : 1,
       }}
     >
-      {dismissible ? (
-        <Checkbox
-          checked={done}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => { hapticLight(); void toggleTaskComplete(note.id!, e.target.checked); }}
-          style={{ marginTop: 2 }}
-        />
-      ) : (
-        <Icon size={16} style={{ color: KIND_COLOR[note.kind], flexShrink: 0, marginTop: 2 }} />
-      )}
+      <Checkbox
+        checked={done}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => { hapticLight(); void toggleTaskComplete(note.id!, e.target.checked); }}
+        style={{ marginTop: 2 }}
+      />
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {dismissible && <Icon size={13} style={{ color: KIND_COLOR[note.kind], flexShrink: 0 }} />}
+          <Icon size={13} style={{ color: KIND_COLOR[note.kind], flexShrink: 0 }} />
           <div style={{ fontSize: 13, fontWeight: 700, textDecoration: done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {note.title || "(untitled)"}
           </div>

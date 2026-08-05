@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Input, Segmented, Switch, Button, Tag } from "antd";
-import { TbNote, TbListCheck, TbBell, TbCalendar, TbX, TbMapPin, TbLink, TbChevronDown, TbChevronUp, TbPlus } from "react-icons/tb";
+import { TbNote, TbListCheck, TbBell, TbCalendar, TbX, TbMapPin, TbLink, TbChevronDown, TbChevronUp, TbPlus, TbPencilPlus } from "react-icons/tb";
 import dayjs from "dayjs";
 import { TimeSelect } from "../../components/TimeSelect";
 import { parseNoteText } from "../../lib/parseNoteText";
@@ -8,6 +8,7 @@ import { createNote } from "../../lib/notes";
 import { requestNotificationPermission } from "../../lib/notifications";
 import { combineDateTime, todayKey } from "../../lib/date.utils";
 import { hapticSuccess } from "../../lib/haptics";
+import { NoteFullEditor } from "./NoteFullEditor";
 import type { NoteKind } from "../../db/types";
 
 const KIND_OPTIONS = [
@@ -30,6 +31,7 @@ const PLACEHOLDERS: Record<NoteKind, string> = {
 // doesn't stomp a correction.
 export function NoteComposer() {
   const [kind, setKind] = useState<NoteKind>("note");
+  const [newNoteOpen, setNewNoteOpen] = useState(false);
   const [rawText, setRawText] = useState("");
   const [dueDate, setDueDate] = useState<string | undefined>(undefined);
   const [allDay, setAllDay] = useState(false);
@@ -117,15 +119,34 @@ export function NoteComposer() {
     <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", background: "var(--toolbar-bg)" }}>
       <Segmented block size="small" value={kind} onChange={(v) => setKind(v as NoteKind)} options={KIND_OPTIONS} style={{ marginBottom: 10 }} />
 
-      <Input.TextArea
-        placeholder={PLACEHOLDERS[kind]}
-        value={rawText}
-        onChange={(e) => onTextChange(e.target.value)}
-        onPressEnter={(e) => { e.preventDefault(); void handleSave(); }}
-        autoSize={{ minRows: 1, maxRows: 4 }}
-      />
+      {kind === "note" ? (
+        // Notes open straight into the full-screen rich editor — same as
+        // tapping Apple Notes' "+": no inline typing area here, because the
+        // whole point of the "keep writing full-screen" ask is that a note's
+        // actual composition never happens in this small pinned bar.
+        <button
+          onClick={() => setNewNoteOpen(true)}
+          style={{
+            width: "100%", textAlign: "left", padding: "8px 11px", borderRadius: 8,
+            border: "1px solid var(--border)", background: "var(--bg)", color: "var(--ink-soft)",
+            fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+          }}
+        >
+          <TbPencilPlus size={16} /> New note…
+        </button>
+      ) : (
+        <Input.TextArea
+          placeholder={PLACEHOLDERS[kind]}
+          value={rawText}
+          onChange={(e) => onTextChange(e.target.value)}
+          onPressEnter={(e) => { e.preventDefault(); void handleSave(); }}
+          autoSize={{ minRows: 1, maxRows: 4 }}
+        />
+      )}
 
-      {(dueDate || links.length > 0) && (
+      {newNoteOpen && <NoteFullEditor note={null} onClose={() => setNewNoteOpen(false)} />}
+
+      {kind !== "note" && (dueDate || links.length > 0) && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
           {dueDate && (
             <Tag icon={<TbCalendar size={12} style={{ verticalAlign: -1 }} />} closable closeIcon={<TbX size={11} />} onClose={clearDate} color="var(--accent)">
@@ -138,32 +159,32 @@ export function NoteComposer() {
         </div>
       )}
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
-        <Button type="text" size="small" onClick={() => setExpanded((v) => !v)} icon={expanded ? <TbChevronUp size={14} /> : <TbChevronDown size={14} />}>
-          Details
-        </Button>
-        <Button type="primary" size="small" onClick={handleSave} disabled={!rawText.trim()}>Add</Button>
-      </div>
+      {kind !== "note" && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+          <Button type="text" size="small" onClick={() => setExpanded((v) => !v)} icon={expanded ? <TbChevronUp size={14} /> : <TbChevronDown size={14} />}>
+            Details
+          </Button>
+          <Button type="primary" size="small" onClick={handleSave} disabled={!rawText.trim()}>Add</Button>
+        </div>
+      )}
 
-      {expanded && (
+      {kind !== "note" && expanded && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-          {kind !== "note" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input
-                  type="date"
-                  value={dueDate ? dueDate.slice(0, 10) : todayKey()}
-                  onChange={(e) => setDatePart(e.target.value)}
-                  style={{ padding: 6, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--ink)" }}
-                />
-                {!allDay && <TimeSelect size="small" value={dueDate ? dayjs(dueDate).format("HH:mm") : "09:00"} onChange={setTimePart} />}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>All-day</span>
-                <Switch size="small" checked={allDay} onChange={setAllDayPart} />
-              </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="date"
+                value={dueDate ? dueDate.slice(0, 10) : todayKey()}
+                onChange={(e) => setDatePart(e.target.value)}
+                style={{ padding: 6, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--ink)" }}
+              />
+              {!allDay && <TimeSelect size="small" value={dueDate ? dayjs(dueDate).format("HH:mm") : "09:00"} onChange={setTimePart} />}
             </div>
-          )}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>All-day</span>
+              <Switch size="small" checked={allDay} onChange={setAllDayPart} />
+            </div>
+          </div>
 
           <Input placeholder="Location (optional)" prefix={<TbMapPin size={14} style={{ color: "var(--ink-soft)" }} />} value={location} onChange={(e) => setLocation(e.target.value)} />
           <Input.TextArea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />

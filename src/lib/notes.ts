@@ -8,6 +8,7 @@ export interface NewNoteInput {
   title: string;
   rawText: string;
   description?: string;
+  body?: string;
   dueDate?: string;
   allDay?: boolean;
   location?: string;
@@ -22,6 +23,7 @@ export async function createNote(input: NewNoteInput): Promise<number> {
     title: input.title,
     rawText: input.rawText,
     description: input.description,
+    body: input.body,
     dueDate: input.dueDate,
     allDay: input.allDay,
     location: input.location,
@@ -30,6 +32,24 @@ export async function createNote(input: NewNoteInput): Promise<number> {
     createdAt: now,
     updatedAt: now,
   } as NoteDto);
+}
+
+// Tiptap HTML -> plain text, for the note-list preview snippet and for
+// deriving `title` (the body's first non-empty line) — the full-screen
+// editor has no separate title input, matching Apple Notes.
+export function htmlToPlainText(html: string): string {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return (div.textContent ?? "").replace(/\s+/g, " ").trim();
+}
+
+// First line only, for the list-row/gallery title.
+export function htmlToTitle(html: string, maxLen = 80): string {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  const firstBlock = div.querySelector("h1, h2, h3, p, li");
+  const line = (firstBlock?.textContent ?? div.textContent ?? "").replace(/\s+/g, " ").trim();
+  return line.length > maxLen ? line.slice(0, maxLen) + "…" : line;
 }
 
 export async function updateNote(id: number, patch: Partial<NoteDto>): Promise<void> {

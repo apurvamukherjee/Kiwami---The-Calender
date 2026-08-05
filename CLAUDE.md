@@ -438,3 +438,80 @@ copy used in earlier phases) at both 390px and 1440px confirmed the nav
 switch, live NLP chip preview, Timeline day-grouping, the Month-view dot
 badge, and the Agenda-view overlay all render correctly with zero console
 errors.
+
+## Phase 5 — Rich-text Notes, Apple Notes-style (2026-08-03)
+
+The "note" kind got real rich text — headers/subheaders, bold/italic/
+underline/strikethrough, text color, bulleted/numbered/checklist lists —
+edited full-screen instead of the small pinned composer, mirroring Apple
+Notes: tap "New note…" (or an existing note card) and the whole viewport
+becomes the writing surface; there's no separate title input, the body's
+first line *is* the title, same as Apple Notes.
+
+**Library**: `@tiptap/react` + `@tiptap/starter-kit` (bundles bold/italic/
+strike/underline/headings/bullet+ordered lists already) + `@tiptap/extension-
+text-style`+`extension-color` (font color) + `extension-task-list`+
+`extension-task-item` (checklist) + `extension-placeholder`. All pure client-
+side JS, zero network calls — consistent with the "100% local" guarantee
+that ruled out real location-NLP in Phase 4. Chosen over Lexical/Slate for
+React-first ergonomics and a StarterKit that already covers most of the
+Apple Notes format menu out of the box.
+
+**Data model**: `NoteDto.body?: string` — Tiptap HTML, `kind: "note"` only.
+`title` is now *derived*, not typed: `lib/notes.ts`'s `htmlToTitle()` takes
+the body's first heading/paragraph/list-item as plain text (`htmlToPlainText`
+also feeds the note-card preview snippet in `NoteListItem`). No Dexie version
+bump needed — `body` is a new, non-indexed field on the existing `notes`
+table.
+
+**`features/notes/NoteFullEditor.tsx`** — a `position: fixed; inset: 0`
+overlay (not a `Sheet`/antd `Modal`), mounted conditionally by its callers
+(`NoteComposer` for a brand-new note, `NotesPage`/`CalendarPage` for tapping
+an existing one) rather than always-mounted with an `open` prop. Autosaves on
+a 600ms debounce after each edit — no Save button, no "did that stick"
+moment. A brand-new note isn't written to Dexie until the first non-empty
+edit (`persist()` no-ops on `editor.isEmpty`), so opening-then-immediately-
+backing-out never leaves a ghost row; an *existing* note that gets fully
+cleared is deliberately left alone rather than auto-deleted (only a truly
+never-saved new note is that forgiving).
+
+**Real bug found and fixed here**: `useBackClose(true, onClose)` — passing a
+literal `true` on this component's first render — made the editor
+self-close a few hundred ms after opening. React StrictMode double-invokes a
+component's effects once on initial mount (mount → cleanup → mount again, to
+catch missing cleanup) purely in dev; `useBackClose`'s cleanup calls
+`history.back()` whenever its own `pushState` is still on top, and that
+`history.back()`'s popstate event arrives *after* the second (real) mount
+has already registered its own listener — which then catches it and calls
+`onClose()`, closing the editor it just opened. Every other `useBackClose`
+caller in this codebase is a `Sheet`-based component that's always mounted
+with `open` starting `false`, so the doubled initial-mount effect
+early-returns and never hits this — `open` only flips `true` later, on a
+real (non-doubled) update. Fixed by mirroring that shape locally instead of
+touching the shared hook (which `CLAUDE.md` already flags as
+fix-and-port-carefully): `NoteFullEditor` starts a local `ready` state at
+`false` and flips it `true` in a `useEffect`, so `useBackClose` only ever
+sees `open: true` on a genuine subsequent render, never as part of the
+doubled initial mount.
+
+**Formatting toolbar**: block-style `<select>` (Title=H1/Heading=H2/
+Subheading=H3/Body=paragraph), Bold/Italic/Underline/Strikethrough toggle
+buttons, a small color-swatch popover (ember/gold/teal/danger + default,
+reusing `useTokens()`), bullet/numbered/checklist list buttons. CSS for the
+`.ProseMirror` content area (heading sizes, task-list checkbox layout,
+placeholder text) lives in `index.css` under `.kiwami-editor-body` — Tiptap
+ships no default styling of its own.
+
+**Scoped out**: images/attachments, tables, font-family choice, note
+pinning/folders — Apple Notes' format menu is large; this covers the
+explicitly requested subset (headers, color, bold/italic, checklists) rather
+than the whole surface.
+
+**Verified**: `npm run typecheck`/`test`/`build` clean (bundle grew to
+~829kB/260kB gzip from Tiptap — noted, not addressed, same "revisit with
+code-splitting if it ever matters" stance as the existing antd bundle-size
+scope-out). A real headless-Chromium pass confirmed: opening a new note,
+applying Title/Heading/Body block styles, bold, checklist (`<li
+data-checked>`), and color (verified via `span[style*="color"]` in the
+DOM) all produce correct markup; closing and reopening the note from the
+gallery round-trips the saved HTML correctly; zero console errors.

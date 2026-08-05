@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import type { EventDto, RecurrenceRuleDto, OccurrenceStatusDto, SettingDto, NoteDto } from "./types";
+import type { EventDto, RecurrenceRuleDto, OccurrenceStatusDto, SettingDto, NoteDto, TaskDto, TaskListDto, TaskTagDto } from "./types";
 
 class KiwamiDB extends Dexie {
   events!: Table<EventDto, number>;
@@ -7,6 +7,9 @@ class KiwamiDB extends Dexie {
   occurrenceStatus!: Table<OccurrenceStatusDto, number>;
   settings!: Table<SettingDto, string>;
   notes!: Table<NoteDto, number>;
+  taskLists!: Table<TaskListDto, number>;
+  tasks!: Table<TaskDto, number>;
+  taskTags!: Table<TaskTagDto, number>;
 
   constructor() {
     super("kiwami");
@@ -31,6 +34,19 @@ class KiwamiDB extends Dexie {
       occurrenceStatus: "++id, eventId, occurrenceDate, &[eventId+occurrenceDate]",
       settings: "&key",
       notes: "++id, ownerId, kind, dueDate",
+    });
+    // v3: adds tasks/taskLists/taskTags (the Tasks/Kanban section). Purely additive —
+    // no upgrade() needed, same convention as v1->v2. `*tagIds` is a Dexie multiEntry
+    // index (array field), enabling fast tag-filter queries without a join table.
+    this.version(3).stores({
+      events: "++id, ownerId, startTime",
+      recurrenceRules: "++id, &eventId",
+      occurrenceStatus: "++id, eventId, occurrenceDate, &[eventId+occurrenceDate]",
+      settings: "&key",
+      notes: "++id, ownerId, kind, dueDate",
+      taskLists: "++id, ownerId, order",
+      tasks: "++id, ownerId, listId, completed, archived, dueDate, *tagIds",
+      taskTags: "++id, ownerId, name",
     });
   }
 }

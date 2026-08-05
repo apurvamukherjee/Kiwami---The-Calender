@@ -7,11 +7,14 @@ import { useThemeMode } from "./hooks/useThemeMode";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { SplashScreen } from "./components/SplashScreen";
 import { InstallPrompt } from "./components/InstallPrompt";
+import { CommandPalette } from "./components/CommandPalette";
 import { BottomNav, type Section } from "./components/BottomNav";
-import { CalendarPage } from "./features/calendar/CalendarPage";
+import { CalendarPage, type CalendarNavRequest } from "./features/calendar/CalendarPage";
 import { NotesPage } from "./features/notes/NotesPage";
+import { TasksPage } from "./features/tasks/TasksPage";
 import { resolveOverdueOccurrences } from "./lib/occurrences";
 import { checkDueReminders } from "./lib/notifications";
+import { todayKey } from "./lib/date.utils";
 
 const SPLASH_SEEN_KEY = "kiwami-splash-seen";
 const REMINDER_SWEEP_INTERVAL_MS = 60_000;
@@ -42,6 +45,37 @@ export default function App() {
   const [mode] = useThemeMode();
   const [section, setSection] = useState<Section>("calendar");
   const isMobile = useIsMobile();
+
+  // Command Palette lives here (not inside CalendarPage) since Tasks is a sibling
+  // top-level section — Ctrl/Cmd+K and the palette instance both need to work
+  // regardless of which section is currently active.
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [pendingCalendarNav, setPendingCalendarNav] = useState<CalendarNavRequest | null>(null);
+  const [pendingTaskId, setPendingTaskId] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    function onPaletteKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    }
+    window.addEventListener("keydown", onPaletteKey);
+    return () => window.removeEventListener("keydown", onPaletteKey);
+  }, []);
+
+  function goToDate(date: string) {
+    setSection("calendar");
+    setPendingCalendarNav({ date, asDay: true, nonce: Date.now() });
+  }
+  function goToToday() {
+    setSection("calendar");
+    setPendingCalendarNav({ date: todayKey(), asDay: false, nonce: Date.now() });
+  }
+  function goToTask(taskId: number) {
+    setSection("tasks");
+    setPendingTaskId(taskId);
+  }
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", mode);
@@ -82,13 +116,35 @@ export default function App() {
         <ReminderSweeper />
         <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100%" }}>
           <div style={{ flex: 1, minHeight: 0 }}>
-            {section === "calendar"
-              ? <CalendarPage section={section} onChangeSection={setSection} />
-              : <NotesPage section={section} onChangeSection={setSection} />}
+            {section === "calendar" ? (
+              <CalendarPage
+                section={section}
+                onChangeSection={setSection}
+                onOpenPalette={() => setPaletteOpen(true)}
+                pendingNav={pendingCalendarNav}
+                onConsumePendingNav={() => setPendingCalendarNav(null)}
+              />
+            ) : section === "notes" ? (
+              <NotesPage section={section} onChangeSection={setSection} />
+            ) : (
+              <TasksPage
+                section={section}
+                onChangeSection={setSection}
+                pendingTaskId={pendingTaskId}
+                onConsumePendingTaskId={() => setPendingTaskId(undefined)}
+              />
+            )}
           </div>
           {isMobile && <BottomNav section={section} onChange={setSection} />}
         </div>
         <InstallPrompt />
+        <CommandPalette
+          open={paletteOpen}
+          onClose={() => setPaletteOpen(false)}
+          onGoToDate={goToDate}
+          onGoToToday={goToToday}
+          onGoToTask={goToTask}
+        />
         {needRefresh && (
           <div style={{
             position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 60,

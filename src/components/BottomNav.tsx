@@ -1,6 +1,6 @@
-import { TbCalendarEvent, TbNotes } from "react-icons/tb";
+import { TbCalendarEvent, TbNotes, TbListCheck } from "react-icons/tb";
 
-export type Section = "calendar" | "notes";
+export type Section = "calendar" | "notes" | "tasks";
 
 interface Props {
   section: Section;
@@ -10,6 +10,7 @@ interface Props {
 const ITEMS: { key: Section; label: string; icon: typeof TbCalendarEvent }[] = [
   { key: "calendar", label: "Calendar", icon: TbCalendarEvent },
   { key: "notes", label: "Notes", icon: TbNotes },
+  { key: "tasks", label: "Tasks", icon: TbListCheck },
 ];
 
 // Mobile-only 2-tab bar. A normal flex child (not position:fixed) in App.tsx's

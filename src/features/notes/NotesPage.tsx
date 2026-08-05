@@ -8,6 +8,7 @@ import type { Section } from "../../components/BottomNav";
 import { NoteComposer } from "./NoteComposer";
 import { NoteListItem } from "./NoteListItem";
 import { NoteEditorSheet } from "./NoteEditorSheet";
+import { NoteFullEditor } from "./NoteFullEditor";
 import { useNotes } from "../../lib/notes";
 import { todayKey } from "../../lib/date.utils";
 import type { NoteDto, NoteKind } from "../../db/types";
@@ -37,6 +38,7 @@ export function NotesPage({ section, onChangeSection }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>("timeline");
   const [editing, setEditing] = useState<NoteDto | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [fullEditorOpen, setFullEditorOpen] = useState(false);
 
   const notes = useNotes(kindFilter === "all" ? undefined : kindFilter);
   const today = todayKey();
@@ -59,9 +61,13 @@ export function NotesPage({ section, onChangeSection }: Props) {
     };
   }, [notes]);
 
+  // Notes open in the full-screen rich editor (Apple Notes-style); Tasks/
+  // Reminders keep the compact NoteEditorSheet — rich text/full-screen
+  // doesn't suit a quick-glance due-date item.
   function openNote(n: NoteDto) {
     setEditing(n);
-    setEditorOpen(true);
+    if (n.kind === "note") setFullEditorOpen(true);
+    else setEditorOpen(true);
   }
 
   const isEmpty = notes.length === 0;
@@ -137,6 +143,7 @@ export function NotesPage({ section, onChangeSection }: Props) {
       </div>
 
       <NoteEditorSheet open={editorOpen} onClose={() => setEditorOpen(false)} note={editing} />
+      {fullEditorOpen && <NoteFullEditor note={editing} onClose={() => setFullEditorOpen(false)} />}
     </div>
   );
 }

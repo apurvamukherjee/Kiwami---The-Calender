@@ -6,11 +6,11 @@ import { TbChevronLeft, TbChevronRight, TbPlus, TbSettings, TbFlame, TbToolsKitc
 import { db } from "../../db/db";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { SettingsSheet } from "../../components/SettingsSheet";
-import { CommandPalette } from "../../components/CommandPalette";
 import { SectionTabs } from "../../components/SectionTabs";
 import type { Section } from "../../components/BottomNav";
 import { useNotesForRange } from "../../lib/notes";
 import { NoteEditorSheet } from "../notes/NoteEditorSheet";
+import { NoteFullEditor } from "../notes/NoteFullEditor";
 import type { NoteDto } from "../../db/types";
 import { useCalendarRange, type CalendarView } from "./useCalendarRange";
 import { useCalendarEvents, type CalendarItem } from "./useCalendarEvents";
@@ -35,15 +35,29 @@ const MOBILE_VIEWS = [
   { label: "Agenda", value: "agenda" },
 ];
 
+// A search-result jump (asDay: true) switches into Day view on that date, matching
+// selectDay's existing behavior; a plain "Go to today" (asDay: false) only moves the
+// current date, preserving whatever view is active — matching the toolbar's own
+// Today button. `nonce` forces the consuming effect to re-fire even when `date`
+// happens to be unchanged from the last request (e.g. "today" pressed twice).
+export interface CalendarNavRequest {
+  date: string;
+  asDay: boolean;
+  nonce: number;
+}
+
 interface Props {
   section: Section;
   onChangeSection: (s: Section) => void;
+  onOpenPalette: () => void;
+  pendingNav?: CalendarNavRequest | null;
+  onConsumePendingNav: () => void;
 }
 
 // Full-width desktop calendar shell (toolbar + active view filling the rest
 // of the viewport) that collapses to Day+Agenda only below the mobile
 // breakpoint — not a phone card scaled up, a real responsive app shell.
-export function CalendarPage({ section, onChangeSection }: Props) {
+export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingNav, onConsumePendingNav }: Props) {
   const isMobile = useIsMobile();
   const [view, setView] = useState<CalendarView>("month");
   const [currentDate, setCurrentDate] = useState(todayKey());
@@ -62,15 +76,15 @@ export function CalendarPage({ section, onChangeSection }: Props) {
   const [foodSheetOpen, setFoodSheetOpen] = useState(false);
   const [foodItem, setFoodItem] = useState<CalendarItem | null>(null);
   const [yearHeatmapOpen, setYearHeatmapOpen] = useState(false);
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
+  const [noteFullEditorOpen, setNoteFullEditorOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<NoteDto | null>(null);
 
   useEffect(() => {
     if (isMobile && (view === "month" || view === "week")) setView("day");
   }, [isMobile, view]);
 
-  const anySheetOpen = editorOpen || routineSheetOpen || foodSheetOpen || settingsOpen || noteEditorOpen;
+  const anySheetOpen = editorOpen || routineSheetOpen || foodSheetOpen || settingsOpen || noteEditorOpen || noteFullEditorOpen;
 
   // Arrow-key date nav + "T" for Today — skipped while typing anywhere or
   // while a sheet is open, so it never fights with form inputs.
@@ -87,19 +101,16 @@ export function CalendarPage({ section, onChangeSection }: Props) {
     return () => window.removeEventListener("keydown", onKeyDown);
   });
 
-  // Ctrl/Cmd+K always works, even while typing elsewhere — the one
-  // deliberate exception to the "skip while a sheet is open" rule above,
-  // matching how command palettes behave in most apps that have one.
+  // Command Palette itself now lives in App.tsx (Tasks is a sibling top-level section,
+  // not nested under Calendar, so Ctrl/Cmd+K and the palette instance had to move up
+  // to work from every section). A search-result jump arrives here as `pendingNav`.
   useEffect(() => {
-    function onPaletteKey(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setPaletteOpen((v) => !v);
-      }
-    }
-    window.addEventListener("keydown", onPaletteKey);
-    return () => window.removeEventListener("keydown", onPaletteKey);
-  }, []);
+    if (!pendingNav) return;
+    if (pendingNav.asDay) selectDay(pendingNav.date);
+    else setCurrentDate(pendingNav.date);
+    onConsumePendingNav();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingNav]);
 
   const periodLabel = useMemo(() => {
     const d = dayjs(currentDate);
@@ -151,7 +162,8 @@ export function CalendarPage({ section, onChangeSection }: Props) {
   }
   function openNote(note: NoteDto) {
     setEditingNote(note);
-    setNoteEditorOpen(true);
+    if (note.kind === "note") setNoteFullEditorOpen(true);
+    else setNoteEditorOpen(true);
   }
 
   return (
@@ -181,7 +193,7 @@ export function CalendarPage({ section, onChangeSection }: Props) {
         <div style={{ fontSize: 15, fontWeight: 800, flex: 1, minWidth: 140 }}>{periodLabel}</div>
         <Segmented value={view} onChange={(v) => setView(v as CalendarView)} options={isMobile ? MOBILE_VIEWS : DESKTOP_VIEWS} />
         <Button type="primary" icon={<TbPlus size={15} />} onClick={() => openCreate()}>New</Button>
-        <Button type="text" icon={<TbSearch size={16} />} onClick={() => setPaletteOpen(true)} aria-label="Search (Ctrl+K)" />
+        <Button type="text" icon={<TbSearch size={16} />} onClick={onOpenPalette} aria-label="Search (Ctrl+K)" />
         <Button type="text" icon={<TbActivity size={17} />} onClick={() => setYearHeatmapOpen(true)} aria-label="Year in review" />
         <Button type="text" icon={<TbSettings size={17} />} onClick={() => setSettingsOpen(true)} aria-label="Settings" />
       </div>
@@ -248,12 +260,7 @@ export function CalendarPage({ section, onChangeSection }: Props) {
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <YearHeatmapSheet open={yearHeatmapOpen} onClose={() => setYearHeatmapOpen(false)} />
       <NoteEditorSheet open={noteEditorOpen} onClose={() => setNoteEditorOpen(false)} note={editingNote} />
-      <CommandPalette
-        open={paletteOpen}
-        onClose={() => setPaletteOpen(false)}
-        onGoToDate={selectDay}
-        onGoToToday={() => setCurrentDate(todayKey())}
-      />
+      {noteFullEditorOpen && <NoteFullEditor note={editingNote} onClose={() => setNoteFullEditorOpen(false)} />}
     </div>
   );
 }
