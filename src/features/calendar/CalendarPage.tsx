@@ -204,6 +204,7 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
             format="D MMM 'YY"
             style={{ width: 100 }}
             aria-label="Jump to date"
+            classNames={{ popup: { root: "kiwami-date-dropdown" } }}
           />
         </div>
         <div style={{ fontSize: 15, fontWeight: 800, flex: 1, minWidth: 140 }}>{periodLabel}</div>

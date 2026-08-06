@@ -42,6 +42,7 @@ export function TaskTagManager({ open, onClose, tags }: Props) {
       footer={null}
       title="Manage tags"
       afterOpenChange={(isOpen) => { if (isOpen) contentRef.current?.focus(); }}
+      mobileFullHeight
       styles={{ body: { maxHeight: "70vh", overflowY: "auto" } }}
     >
       <div ref={contentRef} tabIndex={-1} style={{ outline: "none" }}>

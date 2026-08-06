@@ -155,6 +155,7 @@ export function EventEditorSheet({ open, onClose, item, defaultDate, defaultTime
 
   return (
     <Sheet open={open} onCancel={onClose} footer={null} title={isEdit ? "Edit event" : "New event"}
+      mobileFullHeight
       styles={{ body: { maxHeight: "70vh", overflowY: "auto" } }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 8 }}>
         <Segmented

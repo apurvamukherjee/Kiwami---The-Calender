@@ -1,4 +1,4 @@
-import { useMemo, useState, lazy, Suspense } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import dayjs from "dayjs";
 import { Segmented } from "antd";
 import { TbNotes } from "react-icons/tb";
@@ -9,8 +9,11 @@ import { NoteComposer } from "./NoteComposer";
 import { NoteListItem } from "./NoteListItem";
 import { NoteEditorSheet } from "./NoteEditorSheet";
 import { useNotes } from "../../lib/notes";
+import { useTasks, useTaskLists, useTaskTags, ensureDefaultTaskLists } from "../../lib/tasks";
+import { TaskAgendaRow } from "../tasks/TaskAgendaRow";
+import { TaskDetailSheet } from "../tasks/TaskDetailSheet";
 import { todayKey } from "../../lib/date.utils";
-import type { NoteDto, NoteKind } from "../../db/types";
+import type { NoteDto, NoteKind, TaskDto } from "../../db/types";
 
 // See CalendarPage.tsx's identical comment — Tiptap only loads when a
 // "note"-kind item is actually opened.
@@ -35,6 +38,12 @@ interface Props {
 // (toolbar + view body). NoteComposer stays pinned above the list so
 // quick-capture never requires navigating away from whatever you're
 // currently browsing.
+//
+// "Tasks" here is not a separate data source — it reads the same `tasks`
+// Kanban table the Tasks section and Calendar overlay already use (see
+// db.ts's v4 migration), rendered via TaskAgendaRow/TaskDetailSheet instead
+// of NoteListItem/NoteEditorSheet. Notes/Reminders still live in the
+// `notes` table exactly as before.
 export function NotesPage({ section, onChangeSection }: Props) {
   const isMobile = useIsMobile();
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
@@ -42,38 +51,92 @@ export function NotesPage({ section, onChangeSection }: Props) {
   const [editing, setEditing] = useState<NoteDto | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [fullEditorOpen, setFullEditorOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskDto | null>(null);
+  const [taskDetailOpen, setTaskDetailOpen] = useState(false);
 
-  const notes = useNotes(kindFilter === "all" ? undefined : kindFilter);
+  const allNotes = useNotes();
+  const allTasks = useTasks();
+  const taskLists = useTaskLists();
+  const taskTags = useTaskTags();
   const today = todayKey();
 
-  // Dated entries grouped by day (Timeline) + a trailing "Unscheduled" group
-  // for notes/tasks with no dueDate — same day-grouping shape AgendaView.tsx
-  // already uses for the calendar.
-  const { groups, unscheduled } = useMemo(() => {
-    const dated = [...notes].filter((n) => n.dueDate).sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""));
-    const map = new Map<string, NoteDto[]>();
-    for (const n of dated) {
-      const key = n.dueDate!.slice(0, 10);
-      const arr = map.get(key);
-      if (arr) arr.push(n);
-      else map.set(key, [n]);
-    }
-    return {
-      groups: [...map.entries()].sort(([a], [b]) => a.localeCompare(b)),
-      unscheduled: notes.filter((n) => !n.dueDate),
-    };
-  }, [notes]);
+  useEffect(() => {
+    void ensureDefaultTaskLists();
+  }, []);
 
-  // Notes open in the full-screen rich editor (Apple Notes-style); Tasks/
-  // Reminders keep the compact NoteEditorSheet — rich text/full-screen
-  // doesn't suit a quick-glance due-date item.
+  // kind:"task" notes shouldn't exist post-migration (db.ts v4) — filtered out
+  // here as a harmless safety net rather than trusted to be gone.
+  const notes = useMemo(() => {
+    const base = allNotes.filter((n) => n.kind !== "task");
+    if (kindFilter === "all") return base;
+    if (kindFilter === "task") return [];
+    return base.filter((n) => n.kind === kindFilter);
+  }, [allNotes, kindFilter]);
+
+  const tasks = useMemo(() => {
+    if (kindFilter !== "all" && kindFilter !== "task") return [];
+    return allTasks.filter((t) => !t.wontDo);
+  }, [allTasks, kindFilter]);
+
+  // Dated entries grouped by day (Timeline) + a trailing "Unscheduled" group
+  // for notes/tasks with no date — same day-grouping shape AgendaView.tsx
+  // already uses for the calendar, extended to interleave real Kanban tasks
+  // (keyed off doDate ?? dueDate, same convention as everywhere else tasks
+  // get scheduled) alongside notes/reminders.
+  const { groups, unscheduledNotes, unscheduledTasks } = useMemo(() => {
+    const notesByDate = new Map<string, NoteDto[]>();
+    for (const n of notes) {
+      if (!n.dueDate) continue;
+      const key = n.dueDate.slice(0, 10);
+      const arr = notesByDate.get(key);
+      if (arr) arr.push(n);
+      else notesByDate.set(key, [n]);
+    }
+    for (const arr of notesByDate.values()) arr.sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""));
+
+    const tasksByDate = new Map<string, TaskDto[]>();
+    for (const t of tasks) {
+      const key = (t.doDate ?? t.dueDate)?.slice(0, 10);
+      if (!key) continue;
+      const arr = tasksByDate.get(key);
+      if (arr) arr.push(t);
+      else tasksByDate.set(key, [t]);
+    }
+    for (const arr of tasksByDate.values()) arr.sort((a, b) => (a.doDate ?? a.dueDate ?? "").localeCompare(b.doDate ?? b.dueDate ?? ""));
+
+    const dates = [...new Set([...notesByDate.keys(), ...tasksByDate.keys()])].sort((a, b) => a.localeCompare(b));
+
+    return {
+      groups: dates.map((d) => [d, notesByDate.get(d) ?? [], tasksByDate.get(d) ?? []] as const),
+      unscheduledNotes: notes.filter((n) => !n.dueDate),
+      unscheduledTasks: tasks.filter((t) => !(t.doDate ?? t.dueDate)),
+    };
+  }, [notes, tasks]);
+
+  // "All" (ungrouped) feed — notes and tasks interleaved by recency, same
+  // ordering useNotes() itself used to give a plain notes-only list.
+  const allFeed = useMemo(() => {
+    type Entry = { key: string; createdAt: number; note?: NoteDto; task?: TaskDto };
+    const noteEntries: Entry[] = notes.map((n) => ({ key: `n${n.id}`, createdAt: n.createdAt, note: n }));
+    const taskEntries: Entry[] = tasks.map((t) => ({ key: `t${t.id}`, createdAt: t.createdAt, task: t }));
+    return [...noteEntries, ...taskEntries].sort((a, b) => b.createdAt - a.createdAt);
+  }, [notes, tasks]);
+
+  // Notes open in the full-screen rich editor (Apple Notes-style); Reminders
+  // keep the compact NoteEditorSheet — rich text/full-screen doesn't suit a
+  // quick-glance due-date item. Tasks open the same TaskDetailSheet the
+  // Kanban board and Calendar use.
   function openNote(n: NoteDto) {
     setEditing(n);
     if (n.kind === "note") setFullEditorOpen(true);
     else setEditorOpen(true);
   }
+  function openTask(t: TaskDto) {
+    setEditingTask(t);
+    setTaskDetailOpen(true);
+  }
 
-  const isEmpty = notes.length === 0;
+  const isEmpty = notes.length === 0 && tasks.length === 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
@@ -113,7 +176,7 @@ export function NotesPage({ section, onChangeSection }: Props) {
 
         {!isEmpty && viewMode === "timeline" && (
           <>
-            {groups.map(([date, dayNotes]) => (
+            {groups.map(([date, dayNotes, dayTasks]) => (
               <div key={date}>
                 <div style={{
                   position: "sticky", top: 0, zIndex: 2, background: "var(--bg)",
@@ -125,9 +188,10 @@ export function NotesPage({ section, onChangeSection }: Props) {
                   {date < today && <span className="label-caps" style={{ color: "var(--danger)", marginLeft: 8 }}>Overdue</span>}
                 </div>
                 {dayNotes.map((n) => <NoteListItem key={n.id} note={n} onTap={openNote} dateFormat="time" />)}
+                {dayTasks.map((t) => <TaskAgendaRow key={t.id} task={t} onTap={openTask} dateFormat="time" />)}
               </div>
             ))}
-            {unscheduled.length > 0 && (
+            {(unscheduledNotes.length > 0 || unscheduledTasks.length > 0) && (
               <div>
                 <div style={{
                   position: "sticky", top: 0, zIndex: 2, background: "var(--bg)",
@@ -136,13 +200,18 @@ export function NotesPage({ section, onChangeSection }: Props) {
                 }}>
                   Unscheduled
                 </div>
-                {unscheduled.map((n) => <NoteListItem key={n.id} note={n} onTap={openNote} />)}
+                {unscheduledNotes.map((n) => <NoteListItem key={n.id} note={n} onTap={openNote} />)}
+                {unscheduledTasks.map((t) => <TaskAgendaRow key={t.id} task={t} onTap={openTask} />)}
               </div>
             )}
           </>
         )}
 
-        {!isEmpty && viewMode === "all" && notes.map((n) => <NoteListItem key={n.id} note={n} onTap={openNote} dateFormat="full" />)}
+        {!isEmpty && viewMode === "all" && allFeed.map((e) =>
+          e.note
+            ? <NoteListItem key={e.key} note={e.note} onTap={openNote} dateFormat="full" />
+            : <TaskAgendaRow key={e.key} task={e.task!} onTap={openTask} dateFormat="full" />
+        )}
       </div>
 
       <NoteEditorSheet open={editorOpen} onClose={() => setEditorOpen(false)} note={editing} />
@@ -151,6 +220,7 @@ export function NotesPage({ section, onChangeSection }: Props) {
           <NoteFullEditor note={editing} onClose={() => setFullEditorOpen(false)} />
         </Suspense>
       )}
+      <TaskDetailSheet open={taskDetailOpen} onClose={() => setTaskDetailOpen(false)} task={editingTask} lists={taskLists} tags={taskTags} />
     </div>
   );
 }

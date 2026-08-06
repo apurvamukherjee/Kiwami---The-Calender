@@ -4,7 +4,9 @@ import { TbNote, TbListCheck, TbBell, TbCalendar, TbX, TbMapPin, TbLink, TbChevr
 import dayjs from "dayjs";
 import { TimeSelect } from "../../components/TimeSelect";
 import { parseNoteText } from "../../lib/parseNoteText";
+import { db } from "../../db/db";
 import { createNote } from "../../lib/notes";
+import { createTask, ensureDefaultTaskLists } from "../../lib/tasks";
 import { requestNotificationPermission } from "../../lib/notifications";
 import { combineDateTime, todayKey } from "../../lib/date.utils";
 import { hapticSuccess } from "../../lib/haptics";
@@ -91,20 +93,32 @@ export function NoteComposer() {
     const parsed = parseNoteText(rawText);
     const title = parsed.title;
     if (!title.trim()) return;
-    const allLinks = [...new Set([...links, ...manualLinks])];
 
-    if (kind === "reminder") void requestNotificationPermission();
-
-    await createNote({
-      kind,
-      title: title.trim(),
-      rawText,
-      description: description.trim() || undefined,
-      dueDate,
-      allDay,
-      location: location.trim() || undefined,
-      links: allLinks.length ? allLinks : undefined,
-    });
+    if (kind === "task") {
+      // Writes into the same `tasks` Kanban table the Tasks section/Calendar
+      // use (see db.ts's v4 migration) rather than a NoteDto — this quick-add
+      // just doesn't expose list/priority/tags, so it always lands in the
+      // first (default) list, same as TaskColumn's own inline quick-add.
+      // Queried fresh (not off the `useTaskLists()` hook) so the very first
+      // task ever created — before any list exists — doesn't race a stale
+      // empty closure once ensureDefaultTaskLists() seeds the starter lists.
+      await ensureDefaultTaskLists();
+      const lists = await db.taskLists.orderBy("order").toArray();
+      await createTask({ listId: lists[0].id!, title: title.trim(), description: description.trim() || undefined, dueDate, allDay });
+    } else {
+      const allLinks = [...new Set([...links, ...manualLinks])];
+      if (kind === "reminder") void requestNotificationPermission();
+      await createNote({
+        kind,
+        title: title.trim(),
+        rawText,
+        description: description.trim() || undefined,
+        dueDate,
+        allDay,
+        location: location.trim() || undefined,
+        links: allLinks.length ? allLinks : undefined,
+      });
+    }
 
     hapticSuccess();
     setRawText("");
@@ -153,14 +167,14 @@ export function NoteComposer() {
         </Suspense>
       )}
 
-      {kind !== "note" && (dueDate || links.length > 0) && (
+      {kind !== "note" && (dueDate || (kind === "reminder" && links.length > 0)) && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
           {dueDate && (
             <Tag icon={<TbCalendar size={12} style={{ verticalAlign: -1 }} />} closable closeIcon={<TbX size={11} />} onClose={clearDate} color="var(--accent)">
               {allDay ? dayjs(dueDate).format("D MMM") : dayjs(dueDate).format("D MMM, HH:mm")}
             </Tag>
           )}
-          {links.map((l) => (
+          {kind === "reminder" && links.map((l) => (
             <Tag key={l} icon={<TbLink size={12} style={{ verticalAlign: -1 }} />}>{l.length > 28 ? l.slice(0, 28) + "…" : l}</Tag>
           ))}
         </div>
@@ -193,20 +207,29 @@ export function NoteComposer() {
             </div>
           </div>
 
-          <Input placeholder="Location (optional)" prefix={<TbMapPin size={14} style={{ color: "var(--ink-soft)" }} />} value={location} onChange={(e) => setLocation(e.target.value)} />
+          {/* Location/links aren't fields TaskDto models — a Kanban task only
+              gets a title/description/date here, matching what TaskComposer's
+              own quick-add exposes. Reminders keep both, unchanged. */}
+          {kind === "reminder" && (
+            <Input placeholder="Location (optional)" prefix={<TbMapPin size={14} style={{ color: "var(--ink-soft)" }} />} value={location} onChange={(e) => setLocation(e.target.value)} />
+          )}
           <Input.TextArea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
 
-          <div style={{ display: "flex", gap: 6 }}>
-            <Input placeholder="Add a link" prefix={<TbLink size={14} style={{ color: "var(--ink-soft)" }} />} value={manualLink}
-              onChange={(e) => setManualLink(e.target.value)} onPressEnter={addManualLink} />
-            <Button icon={<TbPlus size={14} />} onClick={addManualLink} />
-          </div>
-          {manualLinks.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {manualLinks.map((l, i) => (
-                <Tag key={l + i} closable onClose={() => setManualLinks((prev) => prev.filter((_, idx) => idx !== i))}>{l}</Tag>
-              ))}
-            </div>
+          {kind === "reminder" && (
+            <>
+              <div style={{ display: "flex", gap: 6 }}>
+                <Input placeholder="Add a link" prefix={<TbLink size={14} style={{ color: "var(--ink-soft)" }} />} value={manualLink}
+                  onChange={(e) => setManualLink(e.target.value)} onPressEnter={addManualLink} />
+                <Button icon={<TbPlus size={14} />} onClick={addManualLink} />
+              </div>
+              {manualLinks.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {manualLinks.map((l, i) => (
+                    <Tag key={l + i} closable onClose={() => setManualLinks((prev) => prev.filter((_, idx) => idx !== i))}>{l}</Tag>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

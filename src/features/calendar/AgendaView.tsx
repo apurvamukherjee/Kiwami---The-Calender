@@ -1,15 +1,13 @@
 import { useMemo } from "react";
 import dayjs from "dayjs";
-import { Checkbox } from "antd";
-import { TbFlame, TbToolsKitchen2, TbRepeat, TbSquareCheck } from "react-icons/tb";
+import { TbFlame, TbToolsKitchen2, TbRepeat } from "react-icons/tb";
 import { useTokens } from "../../hooks/useTokens";
 import { todayKey } from "../../lib/date.utils";
 import { eventColor } from "./timeGrid";
 import { EmberChain } from "../../components/EmberChain";
 import { useRecentBeads } from "../routines/useRoutineStreak";
 import { NoteListItem } from "../notes/NoteListItem";
-import { completeTask, PRIORITY_TOKEN_KEY } from "../../lib/tasks";
-import { hapticLight } from "../../lib/haptics";
+import { TaskAgendaRow } from "../tasks/TaskAgendaRow";
 import type { CalendarItem } from "./useCalendarEvents";
 import type { NoteDto, TaskDto } from "../../db/types";
 
@@ -146,46 +144,6 @@ export function AgendaView({ items, notes, tasks, onTapItem, onTapNote, onTapTas
           ))}
         </div>
       ))}
-    </div>
-  );
-}
-
-// Condensed row for a real Kanban task scheduled on this day — a dashed left
-// border (rather than NoteListItem's solid one) keeps it visually distinct
-// from both a real event's solid color bar and a NoteDto row.
-function TaskAgendaRow({ task, onTap }: { task: TaskDto; onTap: (task: TaskDto) => void }) {
-  const tokens = useTokens();
-  const color = tokens[PRIORITY_TOKEN_KEY[task.priority]];
-  const scheduled = task.doDate ?? task.dueDate;
-
-  return (
-    <div
-      onClick={() => onTap(task)}
-      style={{
-        display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", cursor: "pointer",
-        borderLeft: `3px dashed ${color}`, opacity: task.completed ? 0.6 : 1,
-        borderBottom: "1px solid var(--border)",
-      }}
-    >
-      <Checkbox
-        checked={!!task.completed}
-        onClick={(e) => e.stopPropagation()}
-        onChange={(e) => { hapticLight(); void completeTask(task.id!, e.target.checked); }}
-      />
-      <TbSquareCheck size={15} style={{ color, flexShrink: 0 }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: 13, fontWeight: 700, textDecoration: task.completed ? "line-through" : "none",
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        }}>
-          {task.title}
-        </div>
-      </div>
-      {scheduled && !task.allDay && (
-        <div style={{ width: 56, flexShrink: 0, textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: "var(--ink-soft)" }}>
-          {dayjs(scheduled).format("HH:mm")}
-        </div>
-      )}
     </div>
   );
 }

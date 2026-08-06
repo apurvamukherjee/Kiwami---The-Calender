@@ -4,7 +4,7 @@ import { Checkbox } from "antd";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { TbListCheck, TbRepeat, TbGripVertical, TbBan, TbBattery1, TbBattery2, TbBolt, TbClock } from "react-icons/tb";
+import { TbListCheck, TbRepeat, TbGripVertical, TbBan, TbBattery1, TbBattery2, TbBolt, TbClock, TbSquare, TbSquareCheckFilled } from "react-icons/tb";
 import { useTokens } from "../../hooks/useTokens";
 import { completeTask, PRIORITY_TOKEN_KEY } from "../../lib/tasks";
 import { hapticLight } from "../../lib/haptics";
@@ -137,6 +137,30 @@ function TaskCardBody({ task, tags }: BodyProps) {
                   {task.allDay ? dayjs(task.dueDate).format("D MMM") : dayjs(task.dueDate).format("D MMM, HH:mm")}
                 </span>
               )}
+            </div>
+          )}
+          {/* The full checklist, not just the N/M count above — view-only here
+              (tapping the card opens TaskDetailSheet, where each subtask is
+              actually toggleable/reorderable); a card-level checkbox would
+              fight dnd-kit's own drag-surface listeners on the card body. */}
+          {task.subtasks.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 6 }}>
+              {task.subtasks.map((s) => (
+                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, minWidth: 0 }}>
+                  {s.done ? (
+                    <TbSquareCheckFilled size={12} style={{ color: tokens.teal, flexShrink: 0 }} />
+                  ) : (
+                    <TbSquare size={12} style={{ color: "var(--ink-soft)", opacity: 0.6, flexShrink: 0 }} />
+                  )}
+                  <span style={{
+                    color: s.done ? "var(--ink-soft)" : "var(--ink)",
+                    textDecoration: s.done ? "line-through" : "none",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {s.title}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </div>

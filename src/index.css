@@ -181,9 +181,28 @@ input, textarea, [contenteditable="true"], .selectable {
 
 /* Bottom-sheet mode for Sheet.tsx (phone widths only — desktop uses a
    normal centered dialog). */
-.kiwami-bottom-sheet.ant-modal-wrap { align-items: flex-end; padding: 0; }
+.kiwami-bottom-sheet.ant-modal-wrap { display: flex; align-items: flex-end; padding: 0; }
 .kiwami-bottom-sheet .ant-modal { top: auto; padding: 0; max-width: 100vw; margin: 0; width: 100vw !important; }
 .kiwami-bottom-sheet .ant-modal-content { width: 100vw; box-sizing: border-box; }
+
+/* CalendarPage's toolbar "jump to date" popup — its input sits near the left
+   edge of a narrow toolbar, and the picker panel's own desktop width (~300px+)
+   otherwise carries it past the right edge of a phone viewport with no
+   auto-flip (rc-trigger's default placement doesn't reposition it). Pinning
+   both edges with !important overrides the JS-computed inline `left` antd
+   sets, and width:auto lets the panel fill exactly the space between them. */
+@media (max-width: 640px) {
+  .kiwami-date-dropdown.ant-picker-dropdown {
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+  }
+  .kiwami-date-dropdown .ant-picker-panel-container,
+  .kiwami-date-dropdown .ant-picker-panel,
+  .kiwami-date-dropdown .ant-picker-date-panel {
+    width: 100% !important;
+  }
+}
 
 /* -----------------------------------------------------------------------
    NoteFullEditor's Tiptap content area — Apple-Notes-style rich text.

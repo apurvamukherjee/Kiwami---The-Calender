@@ -1,22 +1,14 @@
 import { useEffect, useState } from "react";
-import { Button, Input, Segmented, Switch, Popconfirm, App, Tag } from "antd";
+import { Button, Input, Switch, Popconfirm, App, Tag } from "antd";
 import dayjs from "dayjs";
-import { TbTrash, TbListCheck, TbBell, TbMapPin, TbLink, TbPlus } from "react-icons/tb";
+import { TbTrash, TbMapPin, TbLink, TbPlus } from "react-icons/tb";
 import { Sheet } from "../../components/Sheet";
 import { TimeSelect } from "../../components/TimeSelect";
 import { useBackClose } from "../../hooks/useBackClose";
 import { updateNote, deleteNote } from "../../lib/notes";
 import { combineDateTime, todayKey } from "../../lib/date.utils";
 import { hapticLight, hapticSuccess } from "../../lib/haptics";
-import type { NoteDto, NoteKind } from "../../db/types";
-
-// Task/Reminder only — a plain "note" is edited full-screen in
-// NoteFullEditor instead (see NotesPage.tsx/CalendarPage.tsx's routing by
-// kind), so this sheet never offers switching into it.
-const KIND_OPTIONS = [
-  { label: <span style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}><TbListCheck size={13} /> Task</span>, value: "task" },
-  { label: <span style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}><TbBell size={13} /> Reminder</span>, value: "reminder" },
-];
+import type { NoteDto } from "../../db/types";
 
 interface Props {
   open: boolean;
@@ -24,13 +16,14 @@ interface Props {
   note: NoteDto | null;
 }
 
-// Tapping an existing Note/Task/Reminder opens this — same
-// save/Popconfirm-delete/toast pattern as EventEditorSheet.tsx.
+// Reminder-only now — a plain "note" is edited full-screen in NoteFullEditor,
+// and "task" notes no longer exist (Tasks are Kanban `tasks` rows edited via
+// TaskDetailSheet; see db.ts's v4 migration and NotesPage.tsx's routing by
+// kind). Same save/Popconfirm-delete/toast pattern as EventEditorSheet.tsx.
 export function NoteEditorSheet({ open, onClose, note }: Props) {
   useBackClose(open, onClose);
   const { message } = App.useApp();
 
-  const [kind, setKind] = useState<NoteKind>("note");
   const [title, setTitle] = useState("");
   const [hasDate, setHasDate] = useState(false);
   const [dueDate, setDueDate] = useState(todayKey());
@@ -43,7 +36,6 @@ export function NoteEditorSheet({ open, onClose, note }: Props) {
 
   useEffect(() => {
     if (!open || !note) return;
-    setKind(note.kind);
     setTitle(note.title);
     setHasDate(!!note.dueDate);
     setDueDate(note.dueDate ? note.dueDate.slice(0, 10) : todayKey());
@@ -64,7 +56,6 @@ export function NoteEditorSheet({ open, onClose, note }: Props) {
   async function handleSave() {
     if (!note?.id || !title.trim()) return;
     await updateNote(note.id, {
-      kind,
       title: title.trim(),
       dueDate: hasDate ? combineDateTime(dueDate, allDay ? "00:00" : time) : undefined,
       allDay: hasDate ? allDay : undefined,
@@ -86,19 +77,15 @@ export function NoteEditorSheet({ open, onClose, note }: Props) {
   }
 
   return (
-    <Sheet open={open} onCancel={onClose} footer={null} title="Edit" styles={{ body: { maxHeight: "70vh", overflowY: "auto" } }}>
+    <Sheet open={open} onCancel={onClose} footer={null} title="Reminder" mobileFullHeight styles={{ body: { maxHeight: "70vh", overflowY: "auto" } }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 8 }}>
-        <Segmented block value={kind} onChange={(v) => setKind(v as NoteKind)} options={KIND_OPTIONS} />
-
         <Input.TextArea placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} autoSize={{ minRows: 1, maxRows: 4 }} autoFocus />
 
-        {kind !== "note" && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>Has a date</span>
-            <Switch size="small" checked={hasDate} onChange={setHasDate} />
-          </div>
-        )}
-        {kind !== "note" && hasDate && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Has a date</span>
+          <Switch size="small" checked={hasDate} onChange={setHasDate} />
+        </div>
+        {hasDate && (
           <>
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
               style={{ padding: 8, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--ink)", width: "100%" }} />

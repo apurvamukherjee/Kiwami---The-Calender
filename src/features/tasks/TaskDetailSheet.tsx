@@ -201,7 +201,7 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
   }
 
   return (
-    <Sheet open={open} onCancel={onClose} footer={null} title="Task" styles={{ body: { maxHeight: "70vh", overflowY: "auto" } }}>
+    <Sheet open={open} onCancel={onClose} footer={null} title="Task" mobileFullHeight styles={{ body: { maxHeight: "70vh", overflowY: "auto" } }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 8 }}>
         <Input.TextArea placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} autoSize={{ minRows: 1, maxRows: 4 }} autoFocus />
 

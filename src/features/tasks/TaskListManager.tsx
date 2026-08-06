@@ -57,6 +57,7 @@ export function TaskListManager({ open, onClose, lists }: Props) {
       footer={null}
       title="Manage lists"
       afterOpenChange={(isOpen) => { if (isOpen) contentRef.current?.focus(); }}
+      mobileFullHeight
       styles={{ body: { maxHeight: "70vh", overflowY: "auto" } }}
     >
       <div ref={contentRef} tabIndex={-1} style={{ outline: "none" }}>
