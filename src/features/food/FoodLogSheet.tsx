@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import dayjs from "dayjs";
 import { Button } from "antd";
 import { TbCheck, TbX, TbToolsKitchen2 } from "react-icons/tb";
@@ -20,6 +21,9 @@ interface Props {
 // same pending/done/missed the routine side uses.
 export function FoodLogSheet({ open, onClose, item, onEdit }: Props) {
   useBackClose(open, onClose);
+  // Content-only sheet, no autoFocus field — same antd Modal focus-trap fix
+  // already applied to TaskListManager.tsx/TaskArchiveView.tsx/FocusSheet.tsx.
+  const contentRef = useRef<HTMLDivElement>(null);
   const eventId = item?.event.id;
   const status = useOccurrenceStatus(eventId, item?.date);
 
@@ -33,8 +37,8 @@ export function FoodLogSheet({ open, onClose, item, onEdit }: Props) {
   if (!item) return null;
 
   return (
-    <Sheet open={open} onCancel={onClose} footer={null} title={item.event.title}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center", padding: "8px 0 4px" }}>
+    <Sheet open={open} onCancel={onClose} footer={null} title={item.event.title} afterOpenChange={(isOpen) => { if (isOpen) contentRef.current?.focus(); }}>
+      <div ref={contentRef} tabIndex={-1} style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center", padding: "8px 0 4px", outline: "none" }}>
         <TbToolsKitchen2 size={28} style={{ color: "var(--teal)" }} />
         <div style={{ fontSize: 13, color: "var(--ink-soft)" }}>
           {dayjs(item.date).format("dddd, D MMMM")} · {item.time}

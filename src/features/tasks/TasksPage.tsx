@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import dayjs from "dayjs";
-import { Button } from "antd";
-import { TbArchive, TbListDetails, TbTags, TbFlame } from "react-icons/tb";
+import { Button, Input } from "antd";
+import { TbArchive, TbListDetails, TbTags, TbFlame, TbTarget, TbChartBar } from "react-icons/tb";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useTokens } from "../../hooks/useTokens";
 import { SectionTabs } from "../../components/SectionTabs";
@@ -12,6 +12,8 @@ import { TaskDetailSheet } from "./TaskDetailSheet";
 import { TaskListManager } from "./TaskListManager";
 import { TaskTagManager } from "./TaskTagManager";
 import { TaskArchiveView } from "./TaskArchiveView";
+import { FocusSheet } from "./FocusSheet";
+import { WeeklyReviewSheet } from "./WeeklyReviewSheet";
 import { useTasks, useTaskLists, useTaskTags, ensureDefaultTaskLists, groupTasksByList } from "../../lib/tasks";
 import type { TaskDto } from "../../db/types";
 
@@ -20,11 +22,19 @@ interface Props {
   onChangeSection: (s: Section) => void;
   pendingTaskId?: number;
   onConsumePendingTaskId: () => void;
+  // Command Palette's "Focus"/"Weekly review" static actions jump here the
+  // same way a task-search result does (App.tsx's goToTask), just without
+  // needing to wait on a live-query lookup first — both sheets open
+  // immediately, so this is consumed as soon as it's seen.
+  pendingTasksAction?: "focus" | "weekly-review" | null;
+  onConsumePendingTasksAction: () => void;
 }
 
 // Tasks section shell, mirroring NotesPage.tsx/CalendarPage.tsx's structure: sticky
 // toolbar -> pinned TaskComposer -> the Kanban board filling the rest of the viewport.
-export function TasksPage({ section, onChangeSection, pendingTaskId, onConsumePendingTaskId }: Props) {
+export function TasksPage({
+  section, onChangeSection, pendingTaskId, onConsumePendingTaskId, pendingTasksAction, onConsumePendingTasksAction,
+}: Props) {
   const isMobile = useIsMobile();
   const tokens = useTokens();
   const tasks = useTasks();
@@ -37,17 +47,42 @@ export function TasksPage({ section, onChangeSection, pendingTaskId, onConsumePe
   const [listManagerOpen, setListManagerOpen] = useState(false);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [focusOpen, setFocusOpen] = useState(false);
+  const [weeklyReviewOpen, setWeeklyReviewOpen] = useState(false);
+  const composerRef = useRef<ComponentRef<typeof Input.TextArea>>(null);
 
   useEffect(() => {
     void ensureDefaultTaskLists();
   }, []);
 
+  const anySheetOpen = detailOpen || listManagerOpen || tagManagerOpen || archiveOpen || focusOpen || weeklyReviewOpen;
+
+  // "n" focuses the composer — mirrors CalendarPage.tsx's arrow-key/"T"
+  // pattern: skipped while typing anywhere or while a sheet is open, so it
+  // never fights with form inputs.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (anySheetOpen) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        composerRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [anySheetOpen]);
+
   const tasksById = useMemo(() => new Map(tasks.filter((t) => t.id != null).map((t) => [t.id!, t])), [tasks]);
   const grouped = useMemo(() => groupTasksByList(tasks), [tasks]);
   const archived = useMemo(() => archivedTasks.filter((t) => t.archived), [archivedTasks]);
+  // Derived from archivedTasks (includeArchived: true), not tasks — a task
+  // completed and archived the same day would otherwise silently drop out
+  // of this count the moment it's archived.
   const doneToday = useMemo(
-    () => tasks.filter((t) => t.lastCompletedAt && dayjs(t.lastCompletedAt).isSame(dayjs(), "day")).length,
-    [tasks],
+    () => archivedTasks.filter((t) => t.lastCompletedAt && dayjs(t.lastCompletedAt).isSame(dayjs(), "day")).length,
+    [archivedTasks],
   );
 
   useEffect(() => {
@@ -63,6 +98,13 @@ export function TasksPage({ section, onChangeSection, pendingTaskId, onConsumePe
     setDetailOpen(true);
     onConsumePendingTaskId();
   }, [pendingTaskId, tasksById, onConsumePendingTaskId]);
+
+  useEffect(() => {
+    if (!pendingTasksAction) return;
+    if (pendingTasksAction === "focus") setFocusOpen(true);
+    else setWeeklyReviewOpen(true);
+    onConsumePendingTasksAction();
+  }, [pendingTasksAction, onConsumePendingTasksAction]);
 
   function openTask(id: number) {
     const t = tasksById.get(id);
@@ -106,12 +148,14 @@ export function TasksPage({ section, onChangeSection, pendingTaskId, onConsumePe
             <TbFlame size={12} /> {doneToday} done today
           </span>
         )}
+        <Button type="text" size="small" icon={<TbTarget size={16} />} onClick={() => setFocusOpen(true)} aria-label="Focus" />
+        <Button type="text" size="small" icon={<TbChartBar size={16} />} onClick={() => setWeeklyReviewOpen(true)} aria-label="Weekly review" />
         <Button type="text" size="small" icon={<TbListDetails size={16} />} onClick={() => setListManagerOpen(true)} aria-label="Manage lists" />
         <Button type="text" size="small" icon={<TbTags size={16} />} onClick={() => setTagManagerOpen(true)} aria-label="Manage tags" />
         <Button type="text" size="small" icon={<TbArchive size={16} />} onClick={() => setArchiveOpen(true)} aria-label="Archive" />
       </div>
 
-      <TaskComposer lists={lists} tags={tags} />
+      <TaskComposer lists={lists} tags={tags} textAreaRef={composerRef} />
 
       <div style={{ flex: 1, minHeight: 0 }}>
         {lists.length === 0 ? (
@@ -127,6 +171,8 @@ export function TasksPage({ section, onChangeSection, pendingTaskId, onConsumePe
       <TaskListManager open={listManagerOpen} onClose={() => setListManagerOpen(false)} lists={lists} />
       <TaskTagManager open={tagManagerOpen} onClose={() => setTagManagerOpen(false)} tags={tags} />
       <TaskArchiveView open={archiveOpen} onClose={() => setArchiveOpen(false)} tasks={archived} lists={lists} />
+      <FocusSheet open={focusOpen} onClose={() => setFocusOpen(false)} tasks={tasks} tags={tags} />
+      <WeeklyReviewSheet open={weeklyReviewOpen} onClose={() => setWeeklyReviewOpen(false)} />
     </div>
   );
 }

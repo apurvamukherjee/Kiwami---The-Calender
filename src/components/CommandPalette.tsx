@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { InputRef } from "antd";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { Modal, Input, Empty } from "antd";
 import dayjs from "dayjs";
-import { TbSearch, TbCalendarEvent, TbFlame, TbToolsKitchen2, TbCalendarCheck, TbFlag } from "react-icons/tb";
+import { TbSearch, TbCalendarEvent, TbFlame, TbToolsKitchen2, TbCalendarCheck, TbFlag, TbTarget, TbChartBar } from "react-icons/tb";
 import { useSearchEvents } from "../features/calendar/useSearchEvents";
 import { useSearchTasks } from "../features/tasks/useSearchTasks";
 import { useTokens } from "../hooks/useTokens";
@@ -15,6 +15,8 @@ interface Props {
   onGoToDate: (date: string) => void;
   onGoToToday: () => void;
   onGoToTask: (taskId: number) => void;
+  onGoToFocus: () => void;
+  onGoToWeeklyReview: () => void;
 }
 
 // One search surface behind two entry points (Ctrl/Cmd+K and the toolbar
@@ -22,7 +24,7 @@ interface Props {
 // useSearchEvents.ts. A floating top-anchored overlay (not the app's usual
 // bottom-sheet-on-mobile Sheet) since a command palette should feel like a
 // keyboard-first spotlight on every device.
-export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToTask }: Props) {
+export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToTask, onGoToFocus, onGoToWeeklyReview }: Props) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const results = useSearchEvents(query);
@@ -40,10 +42,14 @@ export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToT
 
   const staticActions = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const actions: { label: string; run: () => void }[] = [];
-    if (!q || "today".includes(q)) actions.push({ label: "Go to today", run: onGoToToday });
+    const actions: { label: string; icon: ReactNode; run: () => void }[] = [];
+    if (!q || "today".includes(q)) actions.push({ label: "Go to today", icon: <TbCalendarCheck size={14} style={{ color: "var(--accent)" }} />, run: onGoToToday });
+    if (!q || "focus".includes(q)) actions.push({ label: "Focus", icon: <TbTarget size={14} style={{ color: "var(--accent)" }} />, run: onGoToFocus });
+    if (!q || "weekly review".includes(q) || "review".includes(q)) {
+      actions.push({ label: "Weekly review", icon: <TbChartBar size={14} style={{ color: "var(--accent)" }} />, run: onGoToWeeklyReview });
+    }
     return actions;
-  }, [query, onGoToToday]);
+  }, [query, onGoToToday, onGoToFocus, onGoToWeeklyReview]);
 
   const total = staticActions.length + results.length + taskResults.length;
 
@@ -125,7 +131,7 @@ export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToT
                 background: activeIndex === i ? "var(--border)" : "transparent", fontSize: 13, fontWeight: 700,
               }}
             >
-              <TbCalendarCheck size={14} style={{ color: "var(--accent)" }} />
+              {a.icon}
               {a.label}
             </div>
           ))}

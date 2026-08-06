@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { TbChevronRight } from "react-icons/tb";
 import {
   DndContext,
   DragOverlay,
@@ -137,12 +138,20 @@ export function KanbanBoard({ lists, grouped, tasksById, tags, onOpenTask }: Pro
 
   const activeTask = activeId != null ? tasksById.get(activeId) : undefined;
 
+  // Threaded down to TaskCard so its FLIP layout animation (framer-motion's
+  // `layout` prop) can disable itself for every card the instant ANY drag
+  // starts, not just the one being dragged — dnd-kit writes a `transform`
+  // style to every sortable item while a drag is in progress (to preview
+  // the reflow), and letting framer's own layout-driven transform run at
+  // the same time on those same elements would fight it.
+  const dragActive = activeId !== null;
+
   return (
     <DndContext sensors={sensors} collisionDetection={collisionDetectionStrategy} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
       {isDesktop ? (
-        <DesktopBoard lists={lists} columns={columns} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} />
+        <DesktopBoard lists={lists} columns={columns} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} dragActive={dragActive} />
       ) : (
-        <MobileBoard lists={lists} columns={columns} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} />
+        <MobileBoard lists={lists} columns={columns} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} dragActive={dragActive} />
       )}
       <DragOverlay>{activeTask ? <TaskCardOverlay task={activeTask} tags={tags} /> : null}</DragOverlay>
     </DndContext>
@@ -155,16 +164,44 @@ interface BoardProps {
   tasksById: Map<number, TaskDto>;
   tags: TaskTagDto[];
   onOpenTask: (id: number) => void;
+  dragActive: boolean;
 }
 
-function DesktopBoard({ lists, columns, tasksById, tags, onOpenTask }: BoardProps) {
+function DesktopBoard({ lists, columns, tasksById, tags, onOpenTask, dragActive }: BoardProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const check = () => setOverflowing(el.scrollWidth > el.clientWidth + 4);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [lists.length]);
+
   return (
-    <div style={{ display: "flex", gap: 12, padding: 12, height: "100%", overflowX: "auto" }}>
-      {lists.map((list) => (
-        <div key={list.id} style={{ width: 300, flexShrink: 0, height: "100%" }}>
-          <TaskColumn list={list} taskIds={columns[list.id!] ?? []} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} />
+    <div style={{ position: "relative", height: "100%" }}>
+      <div ref={scrollRef} style={{ display: "flex", gap: 12, padding: 12, height: "100%", overflowX: "auto" }}>
+        {lists.map((list) => (
+          <div key={list.id} style={{ width: 300, flexShrink: 0, height: "100%" }}>
+            <TaskColumn list={list} taskIds={columns[list.id!] ?? []} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} dragActive={dragActive} />
+          </div>
+        ))}
+      </div>
+      {/* Board-overflow hint (Part A.7) — a right-edge fade + chevron signaling
+          more columns are scrollable, since a bare overflow-x:auto has no
+          visual cue on its own once the board grows past ~5 lists. */}
+      {overflowing && (
+        <div style={{
+          position: "absolute", top: 0, right: 0, bottom: 0, width: 40, pointerEvents: "none",
+          background: "linear-gradient(to right, transparent, var(--bg) 85%)",
+          display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 4,
+        }}>
+          <TbChevronRight size={16} style={{ color: "var(--ink-soft)" }} />
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -174,7 +211,7 @@ function DesktopBoard({ lists, columns, tasksById, tags, onOpenTask }: BoardProp
 // documented #1 Trello-mobile complaint). Card drag is a physically separate gesture
 // channel from this scroll (see KanbanBoard's TouchSensor delay), so a fast flick
 // scrolls between columns while a press-and-hold on a card picks it up.
-function MobileBoard({ lists, columns, tasksById, tags, onOpenTask }: BoardProps) {
+function MobileBoard({ lists, columns, tasksById, tags, onOpenTask, dragActive }: BoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIdx, setActiveIdx] = useState(0);
 
@@ -193,7 +230,12 @@ function MobileBoard({ lists, columns, tasksById, tags, onOpenTask }: BoardProps
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div style={{ display: "flex", gap: 6, padding: "8px 12px", overflowX: "auto", borderBottom: "1px solid var(--border)" }}>
-        {lists.map((list, i) => (
+        {lists.map((list, i) => {
+          // Tint each pill with its own list color rather than the flat
+          // accent (Part A.8) — stronger at-a-glance differentiation while
+          // swiping between columns.
+          const tint = list.color ?? "var(--accent)";
+          return (
           <button
             key={list.id}
             onClick={() => scrollToIndex(i)}
@@ -204,19 +246,20 @@ function MobileBoard({ lists, columns, tasksById, tags, onOpenTask }: BoardProps
               fontWeight: 700,
               whiteSpace: "nowrap",
               cursor: "pointer",
-              border: `1px solid ${i === activeIdx ? "var(--accent)" : "var(--border)"}`,
-              background: i === activeIdx ? "var(--accent)" : "transparent",
+              border: `1px solid ${i === activeIdx ? tint : "var(--border)"}`,
+              background: i === activeIdx ? tint : "transparent",
               color: i === activeIdx ? "#fff" : "var(--ink)",
             }}
           >
             {list.name} <span style={{ opacity: 0.75 }}>{(columns[list.id!] ?? []).length}</span>
           </button>
-        ))}
+          );
+        })}
       </div>
       <div ref={containerRef} onScroll={onScroll} style={{ display: "flex", flex: 1, minHeight: 0, overflowX: "auto", scrollSnapType: "x mandatory" }}>
         {lists.map((list) => (
           <div key={list.id} style={{ flex: "0 0 100%", scrollSnapAlign: "start", minWidth: 0, height: "100%", padding: 8 }}>
-            <TaskColumn list={list} taskIds={columns[list.id!] ?? []} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} />
+            <TaskColumn list={list} taskIds={columns[list.id!] ?? []} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} dragActive={dragActive} />
           </div>
         ))}
       </div>

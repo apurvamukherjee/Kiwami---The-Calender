@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import dayjs from "dayjs";
 import { Button } from "antd";
 import { TbCheck, TbX, TbFlame } from "react-icons/tb";
@@ -26,6 +27,13 @@ interface Props {
 export function RoutineDetailSheet({ open, onClose, item, onEdit }: Props) {
   useBackClose(open, onClose);
   const tokens = useTokens();
+  // Real bug found while building FocusSheet/WeeklyReviewSheet (which copy
+  // this component's "Floating Blade" treatment): a content-only sheet with
+  // no autoFocus field never gets focus moved into it by antd's Modal on
+  // open, so Escape silently does nothing — the exact issue already
+  // documented and fixed for TaskListManager.tsx/TaskArchiveView.tsx, just
+  // never caught here since this predates that fix.
+  const contentRef = useRef<HTMLDivElement>(null);
   const eventId = item?.event.id;
   const beads = useRecentBeads(eventId, HISTORY_DAYS);
   const streak = useStreakCount(eventId);
@@ -47,12 +55,13 @@ export function RoutineDetailSheet({ open, onClose, item, onEdit }: Props) {
       onCancel={onClose}
       footer={null}
       title={item.event.title}
+      afterOpenChange={(isOpen) => { if (isOpen) contentRef.current?.focus(); }}
       styles={{
         content: { background: `${tokens.surfaceLowest}e6`, backdropFilter: "blur(20px)" },
         header: { background: "transparent" },
       }}
     >
-      <div style={{ position: "relative", overflow: "hidden", borderRadius: 24, padding: "8px 0 4px" }}>
+      <div ref={contentRef} tabIndex={-1} style={{ position: "relative", overflow: "hidden", borderRadius: 24, padding: "8px 0 4px", outline: "none" }}>
         {/* Decorative gradient bloom — the "Floating Blade" hero-panel accent. */}
         <div style={{
           position: "absolute", top: -80, right: -80, width: 200, height: 200, borderRadius: "50%",

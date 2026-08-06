@@ -22,7 +22,7 @@ export function useSearchTasks(query: string): TaskSearchResult[] {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     return tasks
-      .filter((t) => !t.archived && t.title.toLowerCase().includes(q))
+      .filter((t) => !t.archived && !t.wontDo && t.title.toLowerCase().includes(q))
       .sort((a, b) => (a.dueDate ?? "￿").localeCompare(b.dueDate ?? "￿"))
       .slice(0, MAX_RESULTS)
       .map((task) => ({ task, list: listsById.get(task.listId) }));

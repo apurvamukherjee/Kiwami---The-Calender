@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import dayjs from "dayjs";
 import { Button, Segmented, DatePicker } from "antd";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -10,7 +10,6 @@ import { SectionTabs } from "../../components/SectionTabs";
 import type { Section } from "../../components/BottomNav";
 import { useNotesForRange } from "../../lib/notes";
 import { NoteEditorSheet } from "../notes/NoteEditorSheet";
-import { NoteFullEditor } from "../notes/NoteFullEditor";
 import { useTasksForRange, useTaskLists, useTaskTags } from "../../lib/tasks";
 import { TaskDetailSheet } from "../tasks/TaskDetailSheet";
 import type { NoteDto, TaskDto } from "../../db/types";
@@ -25,6 +24,12 @@ import { RoutineDetailSheet } from "../routines/RoutineDetailSheet";
 import { YearHeatmapSheet } from "../routines/YearHeatmapSheet";
 import { FoodLogSheet } from "../food/FoodLogSheet";
 import { todayKey } from "../../lib/date.utils";
+
+// Tiptap (the rich-text editor NoteFullEditor pulls in) is the single
+// heaviest Notes-only dependency — lazy-loaded so it's only fetched the
+// moment a "note"-kind item is actually opened, not bundled into this
+// section's chunk unconditionally.
+const NoteFullEditor = lazy(() => import("../notes/NoteFullEditor").then((m) => ({ default: m.NoteFullEditor })));
 
 const DESKTOP_VIEWS = [
   { label: "Month", value: "month" },
@@ -271,7 +276,11 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <YearHeatmapSheet open={yearHeatmapOpen} onClose={() => setYearHeatmapOpen(false)} />
       <NoteEditorSheet open={noteEditorOpen} onClose={() => setNoteEditorOpen(false)} note={editingNote} />
-      {noteFullEditorOpen && <NoteFullEditor note={editingNote} onClose={() => setNoteFullEditorOpen(false)} />}
+      {noteFullEditorOpen && (
+        <Suspense fallback={null}>
+          <NoteFullEditor note={editingNote} onClose={() => setNoteFullEditorOpen(false)} />
+        </Suspense>
+      )}
       <TaskDetailSheet open={taskDetailOpen} onClose={() => setTaskDetailOpen(false)} task={editingCalTask} lists={taskLists} tags={taskTags} />
     </div>
   );

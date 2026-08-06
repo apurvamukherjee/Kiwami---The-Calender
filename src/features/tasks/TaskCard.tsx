@@ -1,15 +1,17 @@
-import { type CSSProperties, useState } from "react";
+import { useState } from "react";
 import dayjs from "dayjs";
 import { Checkbox } from "antd";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { TbListCheck, TbRepeat, TbGripVertical, TbBan } from "react-icons/tb";
+import { TbListCheck, TbRepeat, TbGripVertical, TbBan, TbBattery1, TbBattery2, TbBolt, TbClock } from "react-icons/tb";
 import { useTokens } from "../../hooks/useTokens";
 import { completeTask, PRIORITY_TOKEN_KEY } from "../../lib/tasks";
 import { hapticLight } from "../../lib/haptics";
 import { taskDndId } from "./taskDnd";
 import type { TaskDto, TaskTagDto } from "../../db/types";
+
+const ENERGY_ICON = { low: TbBattery1, medium: TbBattery2, high: TbBolt };
 
 interface BodyProps {
   task: TaskDto;
@@ -26,8 +28,9 @@ function TaskCardBody({ task, tags }: BodyProps) {
   const taskTags = task.tagIds.map((id) => tags.find((t) => t.id === id)).filter((t): t is TaskTagDto => !!t);
   const subtaskDone = task.subtasks.filter((s) => s.done).length;
   const overdue = !!task.dueDate && !task.completed && dayjs(task.dueDate).isBefore(dayjs(), "day");
-  const hasMeta = taskTags.length > 0 || task.subtasks.length > 0 || !!task.recurrence || !!task.dueDate;
+  const hasMeta = taskTags.length > 0 || task.subtasks.length > 0 || !!task.recurrence || !!task.dueDate || !!task.energy || !!task.estimatedMinutes;
   const dimmed = task.completed || task.wontDo;
+  const EnergyIcon = task.energy ? ENERGY_ICON[task.energy] : null;
 
   return (
     <div
@@ -112,6 +115,16 @@ function TaskCardBody({ task, tags }: BodyProps) {
                 </span>
               )}
               {task.recurrence && <TbRepeat size={11} style={{ color: "var(--ink-soft)" }} />}
+              {EnergyIcon && <EnergyIcon size={11} style={{ color: "var(--ink-soft)" }} />}
+              {(task.estimatedMinutes || task.actualMinutes) && (
+                <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "var(--ink-soft)", fontFamily: "var(--font-mono)" }}>
+                  <TbClock size={11} />
+                  {task.actualMinutes ? `${task.actualMinutes}/${task.estimatedMinutes ?? "?"}m` : `${task.estimatedMinutes}m`}
+                </span>
+              )}
+              {overdue && (
+                <span className="label-caps" style={{ fontSize: 9, color: "var(--danger)" }}>Overdue</span>
+              )}
               {task.dueDate && (
                 <span
                   style={{
@@ -134,21 +147,36 @@ function TaskCardBody({ task, tags }: BodyProps) {
 
 interface CardProps extends BodyProps {
   onOpen: () => void;
+  // Threaded from KanbanBoard: true while ANY card in the board is being
+  // dragged, not just this one. dnd-kit writes its own transform/transition
+  // to every sortable item's style during a drag (to preview the reflow) —
+  // framer-motion's `layout` prop must stay off for that whole window, or
+  // the two positioning systems fight over the same `transform` in the same
+  // frame. `layout` re-enables the instant the drag ends, so FLIP animation
+  // still covers add/remove/reorder-by-filter (the mutations that don't go
+  // through dnd-kit at all).
+  dragActive: boolean;
 }
 
-export function TaskCard({ task, tags, onOpen }: CardProps) {
+export function TaskCard({ task, tags, onOpen, dragActive }: CardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: taskDndId(task.id!) });
-  const style: CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-    marginBottom: 8,
-    cursor: "pointer",
-  };
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} onClick={() => { if (!isDragging) onOpen(); }}>
+    <motion.div
+      ref={setNodeRef}
+      layout={!dragActive}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+        marginBottom: 8,
+        cursor: "pointer",
+      }}
+      {...attributes}
+      {...listeners}
+      onClick={() => { if (!isDragging) onOpen(); }}
+    >
       <TaskCardBody task={task} tags={tags} />
-    </div>
+    </motion.div>
   );
 }
 

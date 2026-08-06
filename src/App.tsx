@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { ConfigProvider, App as AntApp, Button } from "antd";
 import { AnimatePresence } from "framer-motion";
 import { useRegisterSW } from "virtual:pwa-register/react";
@@ -9,12 +9,19 @@ import { SplashScreen } from "./components/SplashScreen";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { CommandPalette } from "./components/CommandPalette";
 import { BottomNav, type Section } from "./components/BottomNav";
-import { CalendarPage, type CalendarNavRequest } from "./features/calendar/CalendarPage";
-import { NotesPage } from "./features/notes/NotesPage";
-import { TasksPage } from "./features/tasks/TasksPage";
+import type { CalendarNavRequest } from "./features/calendar/CalendarPage";
 import { resolveOverdueOccurrences } from "./lib/occurrences";
 import { checkDueReminders } from "./lib/notifications";
 import { todayKey } from "./lib/date.utils";
+
+// Exactly one section renders at a time (the ternary below) — lazy-loading
+// each one keeps Calendar/Notes/Tiptap/Tasks/dnd-kit out of the very first
+// chunk a user downloads, since they only ever need whichever section they
+// open first. Named exports, so each dynamic import is resolved to a
+// default-exported shape lazy() requires.
+const CalendarPage = lazy(() => import("./features/calendar/CalendarPage").then((m) => ({ default: m.CalendarPage })));
+const NotesPage = lazy(() => import("./features/notes/NotesPage").then((m) => ({ default: m.NotesPage })));
+const TasksPage = lazy(() => import("./features/tasks/TasksPage").then((m) => ({ default: m.TasksPage })));
 
 const SPLASH_SEEN_KEY = "kiwami-splash-seen";
 const REMINDER_SWEEP_INTERVAL_MS = 60_000;
@@ -52,6 +59,7 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [pendingCalendarNav, setPendingCalendarNav] = useState<CalendarNavRequest | null>(null);
   const [pendingTaskId, setPendingTaskId] = useState<number | undefined>(undefined);
+  const [pendingTasksAction, setPendingTasksAction] = useState<"focus" | "weekly-review" | null>(null);
 
   useEffect(() => {
     function onPaletteKey(e: KeyboardEvent) {
@@ -75,6 +83,14 @@ export default function App() {
   function goToTask(taskId: number) {
     setSection("tasks");
     setPendingTaskId(taskId);
+  }
+  function goToFocus() {
+    setSection("tasks");
+    setPendingTasksAction("focus");
+  }
+  function goToWeeklyReview() {
+    setSection("tasks");
+    setPendingTasksAction("weekly-review");
   }
 
   useEffect(() => {
@@ -116,24 +132,28 @@ export default function App() {
         <ReminderSweeper />
         <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100%" }}>
           <div style={{ flex: 1, minHeight: 0 }}>
-            {section === "calendar" ? (
-              <CalendarPage
-                section={section}
-                onChangeSection={setSection}
-                onOpenPalette={() => setPaletteOpen(true)}
-                pendingNav={pendingCalendarNav}
-                onConsumePendingNav={() => setPendingCalendarNav(null)}
-              />
-            ) : section === "notes" ? (
-              <NotesPage section={section} onChangeSection={setSection} />
-            ) : (
-              <TasksPage
-                section={section}
-                onChangeSection={setSection}
-                pendingTaskId={pendingTaskId}
-                onConsumePendingTaskId={() => setPendingTaskId(undefined)}
-              />
-            )}
+            <Suspense fallback={null}>
+              {section === "calendar" ? (
+                <CalendarPage
+                  section={section}
+                  onChangeSection={setSection}
+                  onOpenPalette={() => setPaletteOpen(true)}
+                  pendingNav={pendingCalendarNav}
+                  onConsumePendingNav={() => setPendingCalendarNav(null)}
+                />
+              ) : section === "notes" ? (
+                <NotesPage section={section} onChangeSection={setSection} />
+              ) : (
+                <TasksPage
+                  section={section}
+                  onChangeSection={setSection}
+                  pendingTaskId={pendingTaskId}
+                  onConsumePendingTaskId={() => setPendingTaskId(undefined)}
+                  pendingTasksAction={pendingTasksAction}
+                  onConsumePendingTasksAction={() => setPendingTasksAction(null)}
+                />
+              )}
+            </Suspense>
           </div>
           {isMobile && <BottomNav section={section} onChange={setSection} />}
         </div>
@@ -144,6 +164,8 @@ export default function App() {
           onGoToDate={goToDate}
           onGoToToday={goToToday}
           onGoToTask={goToTask}
+          onGoToFocus={goToFocus}
+          onGoToWeeklyReview={goToWeeklyReview}
         />
         {needRefresh && (
           <div style={{

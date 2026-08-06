@@ -91,9 +91,10 @@ export async function completeTask(id: number, completed: boolean): Promise<void
 }
 
 export async function markTaskWontDo(id: number, wontDo: boolean): Promise<void> {
+  const now = Date.now();
   await db.tasks.update(id, wontDo
-    ? { wontDo: true, completed: false, completedAt: undefined, updatedAt: Date.now() }
-    : { wontDo: false, updatedAt: Date.now() });
+    ? { wontDo: true, wontDoAt: now, completed: false, completedAt: undefined, updatedAt: now }
+    : { wontDo: false, updatedAt: now });
 }
 
 export async function archiveTask(id: number): Promise<void> {

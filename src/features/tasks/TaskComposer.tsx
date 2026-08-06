@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentRef, type RefObject } from "react";
 import { Input, Select, Button, Tag, Segmented } from "antd";
 import dayjs from "dayjs";
 import { TbCalendar, TbX, TbChevronDown, TbChevronUp, TbFlag, TbRepeat, TbPlus, TbListCheck } from "react-icons/tb";
@@ -20,6 +20,9 @@ const REPEAT_OPTIONS = [
 interface Props {
   lists: TaskListDto[];
   tags: TaskTagDto[];
+  // TasksPage's "n" shortcut focuses the composer through this — optional
+  // since not every caller (there's only one today) needs it.
+  textAreaRef?: RefObject<ComponentRef<typeof Input.TextArea> | null>;
 }
 
 // Pinned quick-capture bar, mirroring NoteComposer.tsx: text is live-parsed on every
@@ -28,7 +31,7 @@ interface Props {
 // picker) — TaskDetailSheet exposes the full recurrence sub-form for refinement after
 // creation, matching how NoteComposer's quick-add doesn't expose everything
 // NoteEditorSheet does either.
-export function TaskComposer({ lists, tags }: Props) {
+export function TaskComposer({ lists, tags, textAreaRef }: Props) {
   const tokens = useTokens();
   const [rawText, setRawText] = useState("");
   const [dueDate, setDueDate] = useState<string | undefined>(undefined);
@@ -131,6 +134,7 @@ export function TaskComposer({ lists, tags }: Props) {
       </div>
 
       <Input.TextArea
+        ref={textAreaRef}
         placeholder='Add a task — try "renew passport next friday"'
         value={rawText}
         onChange={(e) => onTextChange(e.target.value)}

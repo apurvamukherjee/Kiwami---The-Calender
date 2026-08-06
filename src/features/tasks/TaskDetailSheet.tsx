@@ -1,7 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button, Input, Select, Switch, InputNumber, Segmented, Popconfirm, App, Checkbox } from "antd";
 import dayjs from "dayjs";
-import { TbArchive, TbPlus, TbX, TbRepeat, TbFlag, TbBan, TbArrowBackUp, TbCalendarEvent } from "react-icons/tb";
+import {
+  TbArchive, TbPlus, TbX, TbRepeat, TbFlag, TbBan, TbArrowBackUp, TbCalendarEvent,
+  TbBattery1, TbBattery2, TbBolt, TbClock, TbChevronDown, TbChevronUp, TbGripVertical,
+} from "react-icons/tb";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Sheet } from "../../components/Sheet";
 import { TimeSelect } from "../../components/TimeSelect";
 import { useBackClose } from "../../hooks/useBackClose";
@@ -12,8 +18,16 @@ import { hapticLight, hapticSuccess } from "../../lib/haptics";
 import type { TaskDto, TaskListDto, TaskTagDto, TaskPriority, TaskSubtaskDto, TaskRecurrenceDto, RecurrenceType } from "../../db/types";
 
 type RepeatChoice = "none" | RecurrenceType;
+type EnergyChoice = "none" | "low" | "medium" | "high";
 const PRIORITY_OPTIONS: TaskPriority[] = ["none", "low", "medium", "high", "urgent"];
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+const ENERGY_OPTIONS: { label: ReactNode; value: EnergyChoice }[] = [
+  { label: "None", value: "none" },
+  { label: <span style={{ display: "flex", alignItems: "center", gap: 4 }}><TbBattery1 size={13} /> Low</span>, value: "low" },
+  { label: <span style={{ display: "flex", alignItems: "center", gap: 4 }}><TbBattery2 size={13} /> Medium</span>, value: "medium" },
+  { label: <span style={{ display: "flex", alignItems: "center", gap: 4 }}><TbBolt size={13} /> High</span>, value: "high" },
+];
+const ESTIMATE_PRESETS = [15, 30, 60, 90, 120, 240];
 
 interface Props {
   open: boolean;
@@ -54,6 +68,10 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
   const [hasEndDate, setHasEndDate] = useState(false);
   const [endDate, setEndDate] = useState(todayKey());
   const [newTagName, setNewTagName] = useState("");
+  const [energy, setEnergy] = useState<EnergyChoice>("none");
+  const [estimatedMinutes, setEstimatedMinutes] = useState<number | undefined>(undefined);
+  const [actualMinutes, setActualMinutes] = useState<number | undefined>(undefined);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     if (!open || !task) return;
@@ -78,6 +96,13 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
     setHasEndDate(!!rule?.endDate);
     setEndDate(rule?.endDate ?? todayKey());
     setNewTagName("");
+    setEnergy(task.energy ?? "none");
+    setEstimatedMinutes(task.estimatedMinutes);
+    setActualMinutes(task.actualMinutes);
+    // Default the collapse open if the task already carries any of the
+    // fields it hides, so existing configuration is never hidden from view
+    // — only a task with none of these set starts collapsed.
+    setMoreOpen(!!rule || !!task.energy || !!task.estimatedMinutes);
   }, [open, task]);
 
   function toggleWeekday(d: number) {
@@ -95,6 +120,17 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
   }
   function removeSubtask(id: string) {
     setSubtasks((prev) => prev.filter((s) => s.id !== id));
+  }
+  const subtaskSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  function onSubtaskDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    setSubtasks((prev) => {
+      const oldIndex = prev.findIndex((s) => s.id === active.id);
+      const newIndex = prev.findIndex((s) => s.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
   }
 
   async function addNewTag() {
@@ -132,6 +168,9 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
       allDay: hasDate ? allDay : undefined,
       doDate: hasDoDate ? combineDateTime(doDateValue, "00:00") : undefined,
       recurrence,
+      energy: energy === "none" ? undefined : energy,
+      estimatedMinutes,
+      actualMinutes,
     });
     hapticSuccess();
     message.success("Saved");
@@ -209,91 +248,6 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
                 <TimeSelect value={time} onChange={setTime} size="small" />
               </div>
             )}
-
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
-                <TbRepeat size={14} /> Repeats
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {(["none", "daily", "weekly", "monthly", "custom"] as RepeatChoice[]).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setRepeat(r)}
-                    style={{
-                      flex: "1 0 30%",
-                      padding: "6px 0",
-                      borderRadius: 8,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      textTransform: "capitalize",
-                      border: `1px solid ${repeat === r ? "var(--accent)" : "var(--border)"}`,
-                      background: repeat === r ? `${tokens.accent}18` : "var(--surface)",
-                      color: repeat === r ? "var(--accent)" : "var(--ink)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-
-              {repeat === "weekly" && (
-                <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-                  {WEEKDAY_LABELS.map((label, i) => (
-                    <button
-                      key={i}
-                      onClick={() => toggleWeekday(i)}
-                      style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: "50%",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        border: `1px solid ${weekdays.includes(i) ? "var(--accent)" : "var(--border)"}`,
-                        background: weekdays.includes(i) ? "var(--accent)" : "transparent",
-                        color: weekdays.includes(i) ? "#fff" : "var(--ink)",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {repeat === "monthly" && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-                  <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>On day</span>
-                  <InputNumber size="small" min={1} max={31} value={dayOfMonth} onChange={(v) => setDayOfMonth(v ?? 1)} />
-                </div>
-              )}
-
-              {repeat === "custom" && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-                  <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>Every</span>
-                  <InputNumber size="small" min={1} max={365} value={customInterval} onChange={(v) => setCustomInterval(v ?? 1)} style={{ width: 70 }} />
-                  <Segmented size="small" value={customUnit} onChange={(v) => setCustomUnit(v as "day" | "week")} options={[{ label: "days", value: "day" }, { label: "weeks", value: "week" }]} />
-                </div>
-              )}
-
-              {repeat !== "none" && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>Ends on a date</span>
-                    <Switch size="small" checked={hasEndDate} onChange={setHasEndDate} />
-                  </div>
-                  {hasEndDate && (
-                    <input
-                      type="date"
-                      value={endDate}
-                      min={dueDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      style={{ marginTop: 6, padding: 8, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--ink)", width: "100%" }}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
           </>
         )}
 
@@ -314,13 +268,13 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
 
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", marginBottom: 6 }}>Subtasks</div>
-          {subtasks.map((s) => (
-            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-              <Checkbox checked={s.done} onChange={() => toggleSubtask(s.id)} />
-              <span style={{ flex: 1, fontSize: 13, textDecoration: s.done ? "line-through" : "none" }}>{s.title}</span>
-              <Button type="text" size="small" icon={<TbX size={13} />} onClick={() => removeSubtask(s.id)} aria-label="Remove subtask" />
-            </div>
-          ))}
+          <DndContext sensors={subtaskSensors} collisionDetection={closestCenter} onDragEnd={onSubtaskDragEnd}>
+            <SortableContext items={subtasks.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+              {subtasks.map((s) => (
+                <SubtaskRow key={s.id} subtask={s} onToggle={() => toggleSubtask(s.id)} onRemove={() => removeSubtask(s.id)} />
+              ))}
+            </SortableContext>
+          </DndContext>
           <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
             <Input size="small" placeholder="Add a subtask" value={newSubtask} onChange={(e) => setNewSubtask(e.target.value)} onPressEnter={addSubtask} />
             <Button size="small" icon={<TbPlus size={14} />} onClick={addSubtask} />
@@ -328,6 +282,139 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
         </div>
 
         <Input.TextArea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+
+        <Button type="text" onClick={() => setMoreOpen((v) => !v)} icon={moreOpen ? <TbChevronUp size={14} /> : <TbChevronDown size={14} />} style={{ alignSelf: "flex-start" }}>
+          More details
+        </Button>
+
+        {moreOpen && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Energy</div>
+              <Segmented block size="small" value={energy} onChange={(v) => setEnergy(v as EnergyChoice)} options={ENERGY_OPTIONS} />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
+                <TbClock size={14} /> Estimate
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+                {ESTIMATE_PRESETS.map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setEstimatedMinutes(m)}
+                    style={{
+                      padding: "4px 10px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                      border: `1px solid ${estimatedMinutes === m ? "var(--accent)" : "var(--border)"}`,
+                      background: estimatedMinutes === m ? `${tokens.accent}18` : "var(--surface)",
+                      color: estimatedMinutes === m ? "var(--accent)" : "var(--ink)",
+                    }}
+                  >
+                    {m < 60 ? `${m}m` : `${m / 60}h`}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>Custom (min)</span>
+                <InputNumber size="small" min={1} max={1440} value={estimatedMinutes} onChange={(v) => setEstimatedMinutes(v ?? undefined)} style={{ width: 90 }} />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>Actual time spent (min)</span>
+                <InputNumber size="small" min={1} max={1440} value={actualMinutes} onChange={(v) => setActualMinutes(v ?? undefined)} style={{ width: 90 }} />
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
+                <TbRepeat size={14} /> Repeats
+              </div>
+              {!hasDate && <div style={{ fontSize: 12, color: "var(--ink-soft)" }}>Set a due date to enable recurrence.</div>}
+              {hasDate && (
+                <>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {(["none", "daily", "weekly", "monthly", "custom"] as RepeatChoice[]).map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => setRepeat(r)}
+                        style={{
+                          flex: "1 0 30%",
+                          padding: "6px 0",
+                          borderRadius: 8,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          textTransform: "capitalize",
+                          border: `1px solid ${repeat === r ? "var(--accent)" : "var(--border)"}`,
+                          background: repeat === r ? `${tokens.accent}18` : "var(--surface)",
+                          color: repeat === r ? "var(--accent)" : "var(--ink)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+
+                  {repeat === "weekly" && (
+                    <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+                      {WEEKDAY_LABELS.map((label, i) => (
+                        <button
+                          key={i}
+                          onClick={() => toggleWeekday(i)}
+                          style={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: "50%",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            border: `1px solid ${weekdays.includes(i) ? "var(--accent)" : "var(--border)"}`,
+                            background: weekdays.includes(i) ? "var(--accent)" : "transparent",
+                            color: weekdays.includes(i) ? "#fff" : "var(--ink)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {repeat === "monthly" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                      <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>On day</span>
+                      <InputNumber size="small" min={1} max={31} value={dayOfMonth} onChange={(v) => setDayOfMonth(v ?? 1)} />
+                    </div>
+                  )}
+
+                  {repeat === "custom" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                      <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>Every</span>
+                      <InputNumber size="small" min={1} max={365} value={customInterval} onChange={(v) => setCustomInterval(v ?? 1)} style={{ width: 70 }} />
+                      <Segmented size="small" value={customUnit} onChange={(v) => setCustomUnit(v as "day" | "week")} options={[{ label: "days", value: "day" }, { label: "weeks", value: "week" }]} />
+                    </div>
+                  )}
+
+                  {repeat !== "none" && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>Ends on a date</span>
+                        <Switch size="small" checked={hasEndDate} onChange={setHasEndDate} />
+                      </div>
+                      {hasEndDate && (
+                        <input
+                          type="date"
+                          value={endDate}
+                          min={dueDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          style={{ marginTop: 6, padding: 8, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--ink)", width: "100%" }}
+                        />
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         <Button type="primary" onClick={handleSave}>Save</Button>
 
@@ -344,5 +431,33 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
         </Popconfirm>
       </div>
     </Sheet>
+  );
+}
+
+interface SubtaskRowProps {
+  subtask: TaskSubtaskDto;
+  onToggle: () => void;
+  onRemove: () => void;
+}
+
+function SubtaskRow({ subtask, onToggle, onRemove }: SubtaskRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: subtask.id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        display: "flex", alignItems: "center", gap: 8, marginBottom: 4,
+      }}
+    >
+      <span {...attributes} {...listeners} style={{ cursor: "grab", color: "var(--ink-soft)", display: "flex" }}>
+        <TbGripVertical size={14} />
+      </span>
+      <Checkbox checked={subtask.done} onChange={onToggle} />
+      <span style={{ flex: 1, fontSize: 13, textDecoration: subtask.done ? "line-through" : "none" }}>{subtask.title}</span>
+      <Button type="text" size="small" icon={<TbX size={13} />} onClick={onRemove} aria-label="Remove subtask" />
+    </div>
   );
 }

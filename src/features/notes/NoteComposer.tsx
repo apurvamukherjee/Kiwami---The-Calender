@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { Input, Segmented, Switch, Button, Tag } from "antd";
 import { TbNote, TbListCheck, TbBell, TbCalendar, TbX, TbMapPin, TbLink, TbChevronDown, TbChevronUp, TbPlus, TbPencilPlus } from "react-icons/tb";
 import dayjs from "dayjs";
@@ -8,8 +8,11 @@ import { createNote } from "../../lib/notes";
 import { requestNotificationPermission } from "../../lib/notifications";
 import { combineDateTime, todayKey } from "../../lib/date.utils";
 import { hapticSuccess } from "../../lib/haptics";
-import { NoteFullEditor } from "./NoteFullEditor";
 import type { NoteKind } from "../../db/types";
+
+// See CalendarPage.tsx's identical comment — Tiptap only loads when a new
+// "note"-kind item is actually opened from this composer.
+const NoteFullEditor = lazy(() => import("./NoteFullEditor").then((m) => ({ default: m.NoteFullEditor })));
 
 const KIND_OPTIONS = [
   { label: <span style={{ display: "flex", alignItems: "center", gap: 4 }}><TbNote size={14} /> Note</span>, value: "note" },
@@ -144,7 +147,11 @@ export function NoteComposer() {
         />
       )}
 
-      {newNoteOpen && <NoteFullEditor note={null} onClose={() => setNewNoteOpen(false)} />}
+      {newNoteOpen && (
+        <Suspense fallback={null}>
+          <NoteFullEditor note={null} onClose={() => setNewNoteOpen(false)} />
+        </Suspense>
+      )}
 
       {kind !== "note" && (dueDate || links.length > 0) && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>

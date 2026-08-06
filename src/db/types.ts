@@ -122,9 +122,23 @@ export interface TaskDto {
   // it (see markTaskWontDo). Rendered as "cold ash" on the card, distinct
   // from the warm "done" treatment; excluded from the calendar overlay.
   wontDo?: boolean;
+  // Stamped whenever wontDo flips true — `updatedAt` alone can't answer "was
+  // this marked won't-do this week", since any later edit also bumps it.
+  // Feeds WeeklyReviewSheet's won't-do count.
+  wontDoAt?: number;
   // Guards the reminder sweep (checkDueReminders) from re-firing the same
   // due-date notification on every 60s tick — same role as NoteDto's field.
   notifiedAt?: number;
+  // Dedicated field rather than a tag-naming convention (e.g. an "energy"
+  // tag category) — a real field is filterable/sortable without fragile
+  // string-matching, which FocusSheet's energy-match filter needs.
+  energy?: "low" | "medium" | "high";
+  // Planned-vs-actual time tracking — deliberately two plain numbers, not a
+  // live start/stop timer: a background timer is unreliable the moment the
+  // tab/app closes, real complexity this local-first app doesn't need.
+  // `actualMinutes` is editable any time, not just on completion.
+  estimatedMinutes?: number;
+  actualMinutes?: number;
   archived: boolean; // the primary destructive action's target, not hard delete
   archivedAt?: number;
   createdAt: number;

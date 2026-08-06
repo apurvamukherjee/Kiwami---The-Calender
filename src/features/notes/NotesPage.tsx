@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, lazy, Suspense } from "react";
 import dayjs from "dayjs";
 import { Segmented } from "antd";
 import { TbNotes } from "react-icons/tb";
@@ -8,10 +8,13 @@ import type { Section } from "../../components/BottomNav";
 import { NoteComposer } from "./NoteComposer";
 import { NoteListItem } from "./NoteListItem";
 import { NoteEditorSheet } from "./NoteEditorSheet";
-import { NoteFullEditor } from "./NoteFullEditor";
 import { useNotes } from "../../lib/notes";
 import { todayKey } from "../../lib/date.utils";
 import type { NoteDto, NoteKind } from "../../db/types";
+
+// See CalendarPage.tsx's identical comment — Tiptap only loads when a
+// "note"-kind item is actually opened.
+const NoteFullEditor = lazy(() => import("./NoteFullEditor").then((m) => ({ default: m.NoteFullEditor })));
 
 type KindFilter = "all" | NoteKind;
 type ViewMode = "timeline" | "all";
@@ -143,7 +146,11 @@ export function NotesPage({ section, onChangeSection }: Props) {
       </div>
 
       <NoteEditorSheet open={editorOpen} onClose={() => setEditorOpen(false)} note={editing} />
-      {fullEditorOpen && <NoteFullEditor note={editing} onClose={() => setFullEditorOpen(false)} />}
+      {fullEditorOpen && (
+        <Suspense fallback={null}>
+          <NoteFullEditor note={editing} onClose={() => setFullEditorOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }
