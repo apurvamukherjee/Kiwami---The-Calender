@@ -1,9 +1,10 @@
-import type { CSSProperties } from "react";
+import { type CSSProperties, useState } from "react";
 import dayjs from "dayjs";
 import { Checkbox } from "antd";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { TbListCheck, TbRepeat } from "react-icons/tb";
+import { TbListCheck, TbRepeat, TbGripVertical, TbBan } from "react-icons/tb";
 import { useTokens } from "../../hooks/useTokens";
 import { completeTask, PRIORITY_TOKEN_KEY } from "../../lib/tasks";
 import { hapticLight } from "../../lib/haptics";
@@ -20,43 +21,78 @@ interface BodyProps {
 // duplicate, not a second draggable registration for the same id).
 function TaskCardBody({ task, tags }: BodyProps) {
   const tokens = useTokens();
+  const [burst, setBurst] = useState(false);
   const priorityColor = tokens[PRIORITY_TOKEN_KEY[task.priority]];
   const taskTags = task.tagIds.map((id) => tags.find((t) => t.id === id)).filter((t): t is TaskTagDto => !!t);
   const subtaskDone = task.subtasks.filter((s) => s.done).length;
   const overdue = !!task.dueDate && !task.completed && dayjs(task.dueDate).isBefore(dayjs(), "day");
   const hasMeta = taskTags.length > 0 || task.subtasks.length > 0 || !!task.recurrence || !!task.dueDate;
+  const dimmed = task.completed || task.wontDo;
 
   return (
     <div
       style={{
-        background: "var(--bg)",
+        position: "relative",
+        // Cold-ash wash echoes EmberChain's crater fill for a missed bead —
+        // adapted for a rectangular card rather than reusing its circular
+        // bead JSX directly.
+        background: task.wontDo ? `${tokens.ash}14` : "var(--bg)",
         border: "1px solid var(--border)",
-        borderLeft: `3px solid ${priorityColor}`,
+        borderLeft: `3px solid ${task.wontDo ? tokens.ash : priorityColor}`,
         borderRadius: 10,
         padding: "8px 10px",
-        opacity: task.completed ? 0.55 : 1,
+        opacity: dimmed ? 0.55 : 1,
       }}
     >
+      {/* Visual-only drag affordance — the whole card is still the drag
+          surface (see TaskCard's {...listeners} below); this just signals
+          that fact, since the card had no such cue before. */}
+      <TbGripVertical size={14} style={{ position: "absolute", top: 6, right: 6, color: "var(--ink-soft)", opacity: 0.4, cursor: "grab" }} />
       <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
         {/* A plain wrapper (not a prop on Checkbox — antd's CheckboxProps doesn't
             expose onPointerDown) stops the pointerdown here so dnd-kit's drag sensor
             never arms from a checkbox tap. */}
-        <span onPointerDown={(e) => e.stopPropagation()} style={{ marginTop: 1, display: "flex" }}>
-          <Checkbox
-            checked={!!task.completed}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => {
-              hapticLight();
-              void completeTask(task.id!, e.target.checked);
-            }}
-          />
+        <span onPointerDown={(e) => e.stopPropagation()} style={{ marginTop: 1, display: "flex", position: "relative" }}>
+          {task.wontDo ? (
+            // Won't-do is only reopened from TaskDetailSheet (mirrors how
+            // Archive is already sheet-only) — no checkbox interaction here.
+            <TbBan size={15} style={{ color: tokens.ash }} />
+          ) : (
+            <Checkbox
+              checked={!!task.completed}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                hapticLight();
+                if (e.target.checked) {
+                  setBurst(true);
+                  setTimeout(() => setBurst(false), 650);
+                }
+                void completeTask(task.id!, e.target.checked);
+              }}
+            />
+          )}
+          <AnimatePresence>
+            {burst && (
+              <motion.div
+                initial={{ scale: 0.3, opacity: 0.9 }}
+                animate={{ scale: 2.6, opacity: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                style={{
+                  position: "absolute", inset: -3, borderRadius: "50%",
+                  background: `linear-gradient(135deg, ${tokens.emberHot}, ${tokens.accent})`,
+                  pointerEvents: "none",
+                }}
+              />
+            )}
+          </AnimatePresence>
         </span>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, paddingRight: 14 }}>
           <div
             style={{
               fontSize: 13,
               fontWeight: 700,
-              textDecoration: task.completed ? "line-through" : "none",
+              textDecoration: dimmed ? "line-through" : "none",
               overflow: "hidden",
               textOverflow: "ellipsis",
             }}

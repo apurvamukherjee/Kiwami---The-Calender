@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { Button } from "antd";
-import { TbArchive, TbListDetails } from "react-icons/tb";
+import { TbArchive, TbListDetails, TbTags, TbFlame } from "react-icons/tb";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { useTokens } from "../../hooks/useTokens";
 import { SectionTabs } from "../../components/SectionTabs";
 import type { Section } from "../../components/BottomNav";
 import { TaskComposer } from "./TaskComposer";
 import { KanbanBoard } from "./KanbanBoard";
 import { TaskDetailSheet } from "./TaskDetailSheet";
 import { TaskListManager } from "./TaskListManager";
+import { TaskTagManager } from "./TaskTagManager";
 import { TaskArchiveView } from "./TaskArchiveView";
 import { useTasks, useTaskLists, useTaskTags, ensureDefaultTaskLists, groupTasksByList } from "../../lib/tasks";
 import type { TaskDto } from "../../db/types";
@@ -24,6 +26,7 @@ interface Props {
 // toolbar -> pinned TaskComposer -> the Kanban board filling the rest of the viewport.
 export function TasksPage({ section, onChangeSection, pendingTaskId, onConsumePendingTaskId }: Props) {
   const isMobile = useIsMobile();
+  const tokens = useTokens();
   const tasks = useTasks();
   const archivedTasks = useTasks({ includeArchived: true });
   const lists = useTaskLists();
@@ -32,6 +35,7 @@ export function TasksPage({ section, onChangeSection, pendingTaskId, onConsumePe
   const [detailOpen, setDetailOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskDto | null>(null);
   const [listManagerOpen, setListManagerOpen] = useState(false);
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
 
   useEffect(() => {
@@ -90,11 +94,20 @@ export function TasksPage({ section, onChangeSection, pendingTaskId, onConsumePe
         {!isMobile && <SectionTabs section={section} onChange={onChangeSection} />}
         <div style={{ fontSize: 15, fontWeight: 800, flex: 1, minWidth: 100 }}>Tasks</div>
         {doneToday > 0 && (
-          <span className="label-caps" style={{ color: "var(--accent)", fontSize: 11 }}>
-            {doneToday} done today
+          <span
+            className="label-caps"
+            style={{
+              display: "flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 999,
+              background: `linear-gradient(135deg, ${tokens.emberHot}22, ${tokens.accent}22)`,
+              boxShadow: `0 0 8px ${tokens.accent}55`,
+              color: "var(--accent)", fontSize: 11,
+            }}
+          >
+            <TbFlame size={12} /> {doneToday} done today
           </span>
         )}
         <Button type="text" size="small" icon={<TbListDetails size={16} />} onClick={() => setListManagerOpen(true)} aria-label="Manage lists" />
+        <Button type="text" size="small" icon={<TbTags size={16} />} onClick={() => setTagManagerOpen(true)} aria-label="Manage tags" />
         <Button type="text" size="small" icon={<TbArchive size={16} />} onClick={() => setArchiveOpen(true)} aria-label="Archive" />
       </div>
 
@@ -112,6 +125,7 @@ export function TasksPage({ section, onChangeSection, pendingTaskId, onConsumePe
 
       <TaskDetailSheet open={detailOpen} onClose={() => setDetailOpen(false)} task={editingTask} lists={lists} tags={tags} />
       <TaskListManager open={listManagerOpen} onClose={() => setListManagerOpen(false)} lists={lists} />
+      <TaskTagManager open={tagManagerOpen} onClose={() => setTagManagerOpen(false)} tags={tags} />
       <TaskArchiveView open={archiveOpen} onClose={() => setArchiveOpen(false)} tasks={archived} lists={lists} />
     </div>
   );

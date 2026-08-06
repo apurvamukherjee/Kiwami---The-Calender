@@ -11,7 +11,9 @@ import type { Section } from "../../components/BottomNav";
 import { useNotesForRange } from "../../lib/notes";
 import { NoteEditorSheet } from "../notes/NoteEditorSheet";
 import { NoteFullEditor } from "../notes/NoteFullEditor";
-import type { NoteDto } from "../../db/types";
+import { useTasksForRange, useTaskLists, useTaskTags } from "../../lib/tasks";
+import { TaskDetailSheet } from "../tasks/TaskDetailSheet";
+import type { NoteDto, TaskDto } from "../../db/types";
 import { useCalendarRange, type CalendarView } from "./useCalendarRange";
 import { useCalendarEvents, type CalendarItem } from "./useCalendarEvents";
 import { MonthView } from "./MonthView";
@@ -64,6 +66,9 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
   const { rangeStart, rangeEnd } = useCalendarRange(view, currentDate);
   const items = useCalendarEvents(rangeStart, rangeEnd);
   const notes = useNotesForRange(rangeStart, rangeEnd);
+  const tasks = useTasksForRange(rangeStart, rangeEnd);
+  const taskLists = useTaskLists();
+  const taskTags = useTaskTags();
   const eventCount = useLiveQuery(() => db.events.count(), []);
   const showEmptyState = eventCount === 0;
 
@@ -79,12 +84,14 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
   const [noteFullEditorOpen, setNoteFullEditorOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<NoteDto | null>(null);
+  const [taskDetailOpen, setTaskDetailOpen] = useState(false);
+  const [editingCalTask, setEditingCalTask] = useState<TaskDto | null>(null);
 
   useEffect(() => {
     if (isMobile && (view === "month" || view === "week")) setView("day");
   }, [isMobile, view]);
 
-  const anySheetOpen = editorOpen || routineSheetOpen || foodSheetOpen || settingsOpen || noteEditorOpen || noteFullEditorOpen;
+  const anySheetOpen = editorOpen || routineSheetOpen || foodSheetOpen || settingsOpen || noteEditorOpen || noteFullEditorOpen || taskDetailOpen;
 
   // Arrow-key date nav + "T" for Today — skipped while typing anywhere or
   // while a sheet is open, so it never fights with form inputs.
@@ -165,6 +172,10 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
     if (note.kind === "note") setNoteFullEditorOpen(true);
     else setNoteEditorOpen(true);
   }
+  function openCalTask(task: TaskDto) {
+    setEditingCalTask(task);
+    setTaskDetailOpen(true);
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
@@ -224,7 +235,7 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
         )}
         {view === "month" && (
           <MonthView rangeStart={rangeStart} rangeEnd={rangeEnd} currentDate={currentDate}
-            items={items} notes={notes} onTapItem={openEdit} onTapNote={openNote} onSelectDay={selectDay} />
+            items={items} notes={notes} tasks={tasks} onTapItem={openEdit} onTapNote={openNote} onTapTask={openCalTask} onSelectDay={selectDay} />
         )}
         {view === "week" && (
           <WeekView rangeStart={rangeStart} items={items} onTapItem={openEdit}
@@ -234,7 +245,7 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
           <DayView date={currentDate} items={items} onTapItem={openEdit}
             onCreateAt={(d, t, e) => openCreate(d, t, e)} />
         )}
-        {view === "agenda" && <AgendaView items={items} notes={notes} onTapItem={openEdit} onTapNote={openNote} />}
+        {view === "agenda" && <AgendaView items={items} notes={notes} tasks={tasks} onTapItem={openEdit} onTapNote={openNote} onTapTask={openCalTask} />}
       </div>
 
       <EventEditorSheet
@@ -261,6 +272,7 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
       <YearHeatmapSheet open={yearHeatmapOpen} onClose={() => setYearHeatmapOpen(false)} />
       <NoteEditorSheet open={noteEditorOpen} onClose={() => setNoteEditorOpen(false)} note={editingNote} />
       {noteFullEditorOpen && <NoteFullEditor note={editingNote} onClose={() => setNoteFullEditorOpen(false)} />}
+      <TaskDetailSheet open={taskDetailOpen} onClose={() => setTaskDetailOpen(false)} task={editingCalTask} lists={taskLists} tags={taskTags} />
     </div>
   );
 }

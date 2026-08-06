@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import dayjs from "dayjs";
-import { Button, Popconfirm } from "antd";
+import { Button, Popconfirm, App } from "antd";
 import { TbRestore, TbTrash } from "react-icons/tb";
 import { Sheet } from "../../components/Sheet";
 import { useBackClose } from "../../hooks/useBackClose";
@@ -19,6 +19,7 @@ interface Props {
 // reachable, guarded by its own Popconfirm (matches NoteEditorSheet's delete pattern).
 export function TaskArchiveView({ open, onClose, tasks, lists }: Props) {
   useBackClose(open, onClose);
+  const { message } = App.useApp();
   const listName = (id: number) => lists.find((l) => l.id === id)?.name ?? "—";
   // Two distinct focus issues, both fixed here:
   // 1. With zero focusable content (the "Nothing archived yet" empty state has no
@@ -61,14 +62,14 @@ export function TaskArchiveView({ open, onClose, tasks, lists }: Props) {
                 size="small"
                 icon={<TbRestore size={14} />}
                 aria-label="Restore"
-                onClick={() => { hapticLight(); contentRef.current?.focus(); void unarchiveTask(t.id!); }}
+                onClick={() => { hapticLight(); contentRef.current?.focus(); void unarchiveTask(t.id!); message.success("Restored"); }}
               />
               <Popconfirm
                 title="Delete forever?"
                 description="This can't be undone."
                 okText="Delete"
                 okButtonProps={{ danger: true }}
-                onConfirm={() => { contentRef.current?.focus(); void deleteTaskForever(t.id!); }}
+                onConfirm={() => { contentRef.current?.focus(); void deleteTaskForever(t.id!); message.success("Deleted forever"); }}
               >
                 <Button type="text" size="small" danger icon={<TbTrash size={14} />} aria-label="Delete forever" />
               </Popconfirm>

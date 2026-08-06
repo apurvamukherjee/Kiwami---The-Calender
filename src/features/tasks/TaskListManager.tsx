@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import { Button, Input, Popconfirm } from "antd";
+import { Button, Input, Popconfirm, App } from "antd";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { TbGripVertical, TbTrash, TbPlus } from "react-icons/tb";
 import { Sheet } from "../../components/Sheet";
+import { ColorSwatchPicker } from "../../components/ColorSwatchPicker";
 import { useBackClose } from "../../hooks/useBackClose";
 import { useTokens } from "../../hooks/useTokens";
 import { createTaskList, updateTaskList, archiveTaskList, reorderTaskLists } from "../../lib/tasks";
@@ -22,6 +23,7 @@ interface Props {
 export function TaskListManager({ open, onClose, lists }: Props) {
   useBackClose(open, onClose);
   const tokens = useTokens();
+  const { message } = App.useApp();
   const [newName, setNewName] = useState("");
   const swatches = [tokens.accent, tokens.gold, tokens.teal, tokens.danger, tokens.ash];
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
@@ -66,7 +68,13 @@ export function TaskListManager({ open, onClose, lists }: Props) {
           <SortableContext items={lists.map((l) => l.id!)} strategy={verticalListSortingStrategy}>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {lists.map((l) => (
-                <ListRow key={l.id} list={l} swatches={swatches} onBeforeRowRemoved={() => contentRef.current?.focus()} />
+                <ListRow
+                  key={l.id}
+                  list={l}
+                  swatches={swatches}
+                  onBeforeRowRemoved={() => contentRef.current?.focus()}
+                  onArchived={() => message.success("List archived")}
+                />
               ))}
             </div>
           </SortableContext>
@@ -85,9 +93,10 @@ interface ListRowProps {
   // and break Escape-to-close for the rest of its lifetime (see TaskArchiveView.tsx's
   // identical fix). Called proactively, before the row can disappear.
   onBeforeRowRemoved: () => void;
+  onArchived: () => void;
 }
 
-function ListRow({ list, swatches, onBeforeRowRemoved }: ListRowProps) {
+function ListRow({ list, swatches, onBeforeRowRemoved, onArchived }: ListRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: list.id! });
   const [name, setName] = useState(list.name);
 
@@ -110,22 +119,7 @@ function ListRow({ list, swatches, onBeforeRowRemoved }: ListRowProps) {
       <span {...attributes} {...listeners} style={{ cursor: "grab", color: "var(--ink-soft)", display: "flex" }}>
         <TbGripVertical size={16} />
       </span>
-      <div style={{ display: "flex", gap: 4 }}>
-        {swatches.map((c) => (
-          <button
-            key={c}
-            onClick={() => void updateTaskList(list.id!, { color: c })}
-            style={{
-              width: 16,
-              height: 16,
-              borderRadius: "50%",
-              background: c,
-              cursor: "pointer",
-              border: list.color === c ? "2px solid var(--ink)" : "2px solid transparent",
-            }}
-          />
-        ))}
-      </div>
+      <ColorSwatchPicker value={list.color} swatches={swatches} onChange={(c) => void updateTaskList(list.id!, { color: c })} />
       <Input
         size="small"
         value={name}
@@ -138,7 +132,7 @@ function ListRow({ list, swatches, onBeforeRowRemoved }: ListRowProps) {
         title="Archive this list?"
         description="Its tasks stay but the list is hidden from the board."
         okText="Archive"
-        onConfirm={() => { onBeforeRowRemoved(); void archiveTaskList(list.id!); }}
+        onConfirm={() => { onBeforeRowRemoved(); void archiveTaskList(list.id!); onArchived(); }}
       >
         <Button type="text" size="small" danger icon={<TbTrash size={14} />} />
       </Popconfirm>

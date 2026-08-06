@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Input, Button } from "antd";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { TbPlus } from "react-icons/tb";
+import { TbPlus, TbListCheck } from "react-icons/tb";
 import { createTask } from "../../lib/tasks";
 import { TaskCard } from "./TaskCard";
 import { listDndId, taskDndId } from "./taskDnd";
@@ -68,7 +68,12 @@ export function TaskColumn({ list, taskIds, tasksById, tags, onOpenTask }: Props
 
       <div ref={setNodeRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 8, background: isOver ? "var(--border)" : "transparent" }}>
         <SortableContext items={taskIds.map(taskDndId)} strategy={verticalListSortingStrategy}>
-          {taskIds.length === 0 && <div style={{ fontSize: 12, color: "var(--ink-soft)", textAlign: "center", padding: "24px 0" }}>No tasks</div>}
+          {taskIds.length === 0 && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, color: "var(--ink-soft)", padding: "28px 0" }}>
+              <TbListCheck size={20} style={{ opacity: 0.5 }} />
+              <span style={{ fontSize: 12 }}>No tasks</span>
+            </div>
+          )}
           {taskIds.map((id) => {
             const task = tasksById.get(id);
             if (!task) return null;

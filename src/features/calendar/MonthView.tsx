@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import dayjs from "dayjs";
 import { Popover } from "antd";
-import { TbNote, TbListCheck, TbBell } from "react-icons/tb";
+import { TbNote, TbListCheck, TbBell, TbSquareCheck } from "react-icons/tb";
 import { useTokens } from "../../hooks/useTokens";
 import { eventColor } from "./timeGrid";
 import type { CalendarItem } from "./useCalendarEvents";
-import type { NoteDto } from "../../db/types";
+import type { NoteDto, TaskDto } from "../../db/types";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MAX_PILLS = 3;
@@ -17,15 +17,17 @@ interface Props {
   currentDate: string;
   items: CalendarItem[];
   notes: NoteDto[];
+  tasks: TaskDto[];
   onTapItem: (item: CalendarItem) => void;
   onTapNote: (note: NoteDto) => void;
+  onTapTask: (task: TaskDto) => void;
   onSelectDay: (date: string) => void;
 }
 
 // Full-bleed grid filling all available width/height — a desktop calendar
 // surface, not a mobile card. Cells hold a fixed number of pills + a
 // "+N more" popover for overflow, same pattern Google Calendar uses.
-export function MonthView({ rangeStart, rangeEnd, currentDate, items, notes, onTapItem, onTapNote, onSelectDay }: Props) {
+export function MonthView({ rangeStart, rangeEnd, currentDate, items, notes, tasks, onTapItem, onTapNote, onTapTask, onSelectDay }: Props) {
   const tokens = useTokens();
 
   const days = useMemo(() => {
@@ -62,6 +64,22 @@ export function MonthView({ rangeStart, rangeEnd, currentDate, items, notes, onT
     return map;
   }, [notes]);
 
+  // Merged into the same per-day dot badge as notesByDate below (a distinct
+  // icon disambiguates a real Kanban task from a lightweight NoteDto
+  // kind:"task" row) — keeps the dense Month grid to one small dot per day
+  // rather than a second badge.
+  const tasksByDate = useMemo(() => {
+    const map = new Map<string, TaskDto[]>();
+    for (const t of tasks) {
+      const key = (t.doDate ?? t.dueDate)?.slice(0, 10);
+      if (!key) continue;
+      const arr = map.get(key);
+      if (arr) arr.push(t);
+      else map.set(key, [t]);
+    }
+    return map;
+  }, [tasks]);
+
   const currentMonth = dayjs(currentDate).format("YYYY-MM");
   const today = dayjs().format("YYYY-MM-DD");
   const weekRows = days.length / 7;
@@ -83,6 +101,7 @@ export function MonthView({ rangeStart, rangeEnd, currentDate, items, notes, onT
           const visible = dayItems.slice(0, MAX_PILLS);
           const overflow = dayItems.length - visible.length;
           const dayNotes = notesByDate.get(date) ?? [];
+          const dayTasks = tasksByDate.get(date) ?? [];
           return (
             <div
               key={date}
@@ -103,7 +122,7 @@ export function MonthView({ rangeStart, rangeEnd, currentDate, items, notes, onT
                   filter: "blur(14px)", pointerEvents: "none",
                 }} />
               )}
-              {dayNotes.length > 0 && (
+              {(dayNotes.length > 0 || dayTasks.length > 0) && (
                 <Popover
                   trigger="click"
                   content={
@@ -111,12 +130,18 @@ export function MonthView({ rangeStart, rangeEnd, currentDate, items, notes, onT
                       {dayNotes.map((n) => {
                         const Icon = NOTE_KIND_ICON[n.kind];
                         return (
-                          <div key={n.id} onClick={() => onTapNote(n)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}>
+                          <div key={`note-${n.id}`} onClick={() => onTapNote(n)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}>
                             <Icon size={12} style={{ flexShrink: 0, color: "var(--ink-soft)" }} />
                             {n.title}
                           </div>
                         );
                       })}
+                      {dayTasks.map((t) => (
+                        <div key={`task-${t.id}`} onClick={() => onTapTask(t)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, textDecoration: t.completed ? "line-through" : "none" }}>
+                          <TbSquareCheck size={12} style={{ flexShrink: 0, color: "var(--accent)" }} />
+                          {t.title}
+                        </div>
+                      ))}
                     </div>
                   }
                 >
@@ -126,7 +151,7 @@ export function MonthView({ rangeStart, rangeEnd, currentDate, items, notes, onT
                       position: "absolute", top: 6, right: 6, width: 7, height: 7, borderRadius: "50%",
                       background: "var(--teal)", cursor: "pointer", zIndex: 1,
                     }}
-                    aria-label={`${dayNotes.length} note${dayNotes.length > 1 ? "s" : ""}`}
+                    aria-label={`${dayNotes.length + dayTasks.length} item${dayNotes.length + dayTasks.length > 1 ? "s" : ""}`}
                   />
                 </Popover>
               )}

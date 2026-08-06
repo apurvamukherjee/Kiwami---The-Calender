@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Select, Switch, InputNumber, Segmented, Popconfirm, App, Checkbox } from "antd";
 import dayjs from "dayjs";
-import { TbArchive, TbPlus, TbX, TbRepeat, TbFlag } from "react-icons/tb";
+import { TbArchive, TbPlus, TbX, TbRepeat, TbFlag, TbBan, TbArrowBackUp, TbCalendarEvent } from "react-icons/tb";
 import { Sheet } from "../../components/Sheet";
 import { TimeSelect } from "../../components/TimeSelect";
 import { useBackClose } from "../../hooks/useBackClose";
 import { useTokens } from "../../hooks/useTokens";
-import { updateTask, archiveTask, createTaskTag, PRIORITY_LABEL, PRIORITY_TOKEN_KEY } from "../../lib/tasks";
+import { updateTask, archiveTask, createTaskTag, markTaskWontDo, PRIORITY_LABEL, PRIORITY_TOKEN_KEY } from "../../lib/tasks";
 import { todayKey, combineDateTime } from "../../lib/date.utils";
 import { hapticLight, hapticSuccess } from "../../lib/haptics";
 import type { TaskDto, TaskListDto, TaskTagDto, TaskPriority, TaskSubtaskDto, TaskRecurrenceDto, RecurrenceType } from "../../db/types";
@@ -42,6 +42,8 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
   const [dueDate, setDueDate] = useState(todayKey());
   const [allDay, setAllDay] = useState(false);
   const [time, setTime] = useState("09:00");
+  const [hasDoDate, setHasDoDate] = useState(false);
+  const [doDateValue, setDoDateValue] = useState(todayKey());
   const [subtasks, setSubtasks] = useState<TaskSubtaskDto[]>([]);
   const [newSubtask, setNewSubtask] = useState("");
   const [repeat, setRepeat] = useState<RepeatChoice>("none");
@@ -64,6 +66,8 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
     setDueDate(task.dueDate ? task.dueDate.slice(0, 10) : todayKey());
     setAllDay(!!task.allDay);
     setTime(task.dueDate ? dayjs(task.dueDate).format("HH:mm") : "09:00");
+    setHasDoDate(!!task.doDate);
+    setDoDateValue(task.doDate ? task.doDate.slice(0, 10) : task.dueDate ? task.dueDate.slice(0, 10) : todayKey());
     setSubtasks(task.subtasks);
     const rule = task.recurrence;
     setRepeat(rule?.type ?? "none");
@@ -126,6 +130,7 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
       subtasks,
       dueDate: hasDate ? combineDateTime(dueDate, allDay ? "00:00" : time) : undefined,
       allDay: hasDate ? allDay : undefined,
+      doDate: hasDoDate ? combineDateTime(doDateValue, "00:00") : undefined,
       recurrence,
     });
     hapticSuccess();
@@ -139,6 +144,21 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
     hapticLight();
     message.success("Archived");
     onClose();
+  }
+
+  async function handleWontDo() {
+    if (!task?.id) return;
+    await markTaskWontDo(task.id, true);
+    hapticLight();
+    message.success("Marked as won't do");
+    onClose();
+  }
+
+  async function handleReopen() {
+    if (!task?.id) return;
+    await markTaskWontDo(task.id, false);
+    hapticLight();
+    message.success("Reopened");
   }
 
   return (
@@ -277,6 +297,21 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
           </>
         )}
 
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+            <TbCalendarEvent size={14} /> Do date
+          </span>
+          <Switch size="small" checked={hasDoDate} onChange={setHasDoDate} />
+        </div>
+        {hasDoDate && (
+          <input
+            type="date"
+            value={doDateValue}
+            onChange={(e) => setDoDateValue(e.target.value)}
+            style={{ padding: 8, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--ink)", width: "100%" }}
+          />
+        )}
+
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", marginBottom: 6 }}>Subtasks</div>
           {subtasks.map((s) => (
@@ -295,6 +330,14 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
         <Input.TextArea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
 
         <Button type="primary" onClick={handleSave}>Save</Button>
+
+        {task?.wontDo ? (
+          <Button icon={<TbArrowBackUp />} onClick={handleReopen}>Reopen</Button>
+        ) : (
+          <Popconfirm title="Mark as won't do?" description="You can reopen it later." okText="Won't do" onConfirm={handleWontDo}>
+            <Button icon={<TbBan />}>Won't do</Button>
+          </Popconfirm>
+        )}
 
         <Popconfirm title="Archive this task?" description="You can restore it later from the Archive." okText="Archive" onConfirm={handleArchive}>
           <Button danger icon={<TbArchive />}>Archive</Button>

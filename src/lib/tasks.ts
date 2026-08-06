@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
+import dayjs from "dayjs";
 import { db } from "../db/db";
 import { TOKENS } from "../theme";
 import { getDeviceId } from "./deviceId";
@@ -71,11 +72,28 @@ export async function completeTask(id: number, completed: boolean): Promise<void
   if (task?.recurrence && task.dueDate) {
     const next = rollTaskDueDateForward(task.dueDate, task.recurrence, !!task.allDay);
     if (next) {
-      await db.tasks.update(id, { dueDate: next, completed: false, lastCompletedAt: now, updatedAt: now });
+      // Preserve the original offset between doDate and dueDate (rather than
+      // re-deriving doDate from the recurrence rule directly) so a doDate
+      // that was deliberately set a day or two before its dueDate keeps
+      // that same lead time on every future occurrence. Diffed/added in
+      // minutes via dayjs (local-time strings, no "Z" suffix — see
+      // date.utils.ts) rather than Date#toISOString(), which would silently
+      // convert to UTC and desync from every other dueDate/doDate string's
+      // local-format convention.
+      const doDate = task.doDate
+        ? dayjs(task.doDate).add(dayjs(next).diff(dayjs(task.dueDate), "minute"), "minute").format("YYYY-MM-DDTHH:mm:00")
+        : undefined;
+      await db.tasks.update(id, { dueDate: next, doDate, completed: false, lastCompletedAt: now, updatedAt: now });
       return;
     }
   }
   await db.tasks.update(id, { completed: true, completedAt: now, lastCompletedAt: now, updatedAt: now });
+}
+
+export async function markTaskWontDo(id: number, wontDo: boolean): Promise<void> {
+  await db.tasks.update(id, wontDo
+    ? { wontDo: true, completed: false, completedAt: undefined, updatedAt: Date.now() }
+    : { wontDo: false, updatedAt: Date.now() });
 }
 
 export async function archiveTask(id: number): Promise<void> {
@@ -211,4 +229,25 @@ export function useTasks(opts?: { includeArchived?: boolean }): TaskDto[] {
 export function useTasksByList(opts?: { includeArchived?: boolean }): Map<number, TaskDto[]> {
   const tasks = useTasks(opts);
   return useMemo(() => groupTasksByList(tasks), [tasks]);
+}
+
+// Tasks scheduled within [rangeStart, rangeEnd] (both YYYY-MM-DD, inclusive),
+// keyed off `doDate ?? dueDate` — feeds Calendar's Month/Agenda overlay,
+// mirroring lib/notes.ts's useNotesForRange. Archived and won't-do tasks are
+// excluded (neither belongs on a "what's scheduled" view); completed tasks
+// still show, same dimmed-not-removed treatment Month/Agenda already give a
+// done/missed CalendarItem.
+export function useTasksForRange(rangeStart: string, rangeEnd: string): TaskDto[] {
+  return (
+    useLiveQuery(async () => {
+      const all = await db.tasks.toArray();
+      return all.filter((t) => {
+        if (t.archived || t.wontDo) return false;
+        const scheduled = t.doDate ?? t.dueDate;
+        if (!scheduled) return false;
+        const d = scheduled.slice(0, 10);
+        return d >= rangeStart && d <= rangeEnd;
+      });
+    }, [rangeStart, rangeEnd]) ?? []
+  );
 }

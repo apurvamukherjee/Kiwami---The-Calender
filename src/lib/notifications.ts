@@ -27,8 +27,6 @@ export async function checkDueReminders(onFallback?: (r: DueReminder) => void): 
   const due = (await db.notes.where("kind").equals("reminder").toArray()).filter(
     (n) => n.dueDate && !n.notifiedAt && new Date(n.dueDate).getTime() <= now,
   );
-  if (due.length === 0) return;
-
   const canNotify = typeof Notification !== "undefined" && Notification.permission === "granted";
   for (const n of due) {
     if (canNotify) {
@@ -37,6 +35,24 @@ export async function checkDueReminders(onFallback?: (r: DueReminder) => void): 
       onFallback?.({ id: n.id!, title: n.title || "Reminder" });
     }
     await db.notes.update(n.id!, { notifiedAt: now });
+  }
+
+  // Real Kanban tasks (db.tasks — distinct from the lightweight NoteDto
+  // kind:"reminder" swept above) had no reminder path at all before Stage 2:
+  // any task with a due date now notifies once when it passes, symmetric
+  // with how a NoteDto reminder already fires — no separate "remind me" flag
+  // needed. Won't-do/completed/archived tasks are excluded, same as they're
+  // excluded from the calendar overlay (lib/tasks.ts's useTasksForRange).
+  const dueTasks = (await db.tasks.toArray()).filter(
+    (t) => t.dueDate && !t.notifiedAt && !t.archived && !t.wontDo && !t.completed && new Date(t.dueDate).getTime() <= now,
+  );
+  for (const t of dueTasks) {
+    if (canNotify) {
+      new Notification(t.title || "Task due", { tag: `kiwami-task-${t.id}` });
+    } else {
+      onFallback?.({ id: t.id!, title: t.title || "Task due" });
+    }
+    await db.tasks.update(t.id!, { notifiedAt: now });
   }
 }
 

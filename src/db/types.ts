@@ -105,6 +105,12 @@ export interface TaskDto {
   tagIds: number[];
   subtasks: TaskSubtaskDto[];
   dueDate?: string; // ISO local datetime, date.utils.ts shape
+  // "When you plan to work on it", distinct from dueDate ("when it's due") —
+  // Stage 2's unified do/due model. Independently settable; the calendar
+  // overlay and TaskDetailSheet's "Do date" toggle both key off `doDate ??
+  // dueDate`. Rolled forward alongside dueDate on a recurring completion
+  // (see completeTask), preserving the original offset between the two.
+  doDate?: string;
   allDay?: boolean;
   recurrence?: TaskRecurrenceDto | null;
   completed: boolean;
@@ -112,6 +118,13 @@ export interface TaskDto {
   // Stamped on every completion, including a recurring roll-forward — the sole input
   // to the optional "N done today" indicator. Deliberately not a streak.
   lastCompletedAt?: number;
+  // A third terminal state alongside `completed` — mutually exclusive with
+  // it (see markTaskWontDo). Rendered as "cold ash" on the card, distinct
+  // from the warm "done" treatment; excluded from the calendar overlay.
+  wontDo?: boolean;
+  // Guards the reminder sweep (checkDueReminders) from re-firing the same
+  // due-date notification on every 60s tick — same role as NoteDto's field.
+  notifiedAt?: number;
   archived: boolean; // the primary destructive action's target, not hard delete
   archivedAt?: number;
   createdAt: number;

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Input, Select, Button, Tag, Segmented } from "antd";
 import dayjs from "dayjs";
-import { TbCalendar, TbX, TbChevronDown, TbChevronUp, TbFlag, TbRepeat } from "react-icons/tb";
+import { TbCalendar, TbX, TbChevronDown, TbChevronUp, TbFlag, TbRepeat, TbPlus, TbListCheck } from "react-icons/tb";
 import { parseNoteText } from "../../lib/parseNoteText";
 import { createTask, PRIORITY_LABEL, PRIORITY_TOKEN_KEY } from "../../lib/tasks";
 import { useTokens } from "../../hooks/useTokens";
 import { hapticSuccess } from "../../lib/haptics";
-import type { TaskListDto, TaskTagDto, TaskPriority, TaskRecurrenceDto } from "../../db/types";
+import type { TaskListDto, TaskTagDto, TaskPriority, TaskRecurrenceDto, TaskSubtaskDto } from "../../db/types";
 
 const PRIORITY_OPTIONS: TaskPriority[] = ["none", "low", "medium", "high", "urgent"];
 type RepeatChoice = "none" | "daily" | "weekly" | "monthly";
@@ -39,6 +39,8 @@ export function TaskComposer({ lists, tags }: Props) {
   const [tagIds, setTagIds] = useState<number[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [repeat, setRepeat] = useState<RepeatChoice>("none");
+  const [subtasks, setSubtasks] = useState<TaskSubtaskDto[]>([]);
+  const [newSubtask, setNewSubtask] = useState("");
 
   useEffect(() => {
     if (listId === undefined && lists[0]?.id != null) setListId(lists[0].id);
@@ -61,6 +63,16 @@ export function TaskComposer({ lists, tags }: Props) {
     setAllDay(parsed.allDay);
   }
 
+  function addSubtask() {
+    const t = newSubtask.trim();
+    if (!t) return;
+    setSubtasks((prev) => [...prev, { id: crypto.randomUUID(), title: t, done: false }]);
+    setNewSubtask("");
+  }
+  function removeSubtask(id: string) {
+    setSubtasks((prev) => prev.filter((s) => s.id !== id));
+  }
+
   function buildRecurrence(): TaskRecurrenceDto | null {
     if (repeat === "none" || !dueDate) return null;
     const d = dayjs(dueDate);
@@ -81,6 +93,7 @@ export function TaskComposer({ lists, tags }: Props) {
       allDay,
       priority,
       tagIds,
+      subtasks,
       recurrence: buildRecurrence(),
     });
 
@@ -92,6 +105,8 @@ export function TaskComposer({ lists, tags }: Props) {
     setPriority("none");
     setTagIds([]);
     setRepeat("none");
+    setSubtasks([]);
+    setNewSubtask("");
     setExpanded(false);
   }
 
@@ -141,6 +156,21 @@ export function TaskComposer({ lists, tags }: Props) {
       {expanded && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
           <Select mode="multiple" size="small" placeholder="Tags" value={tagIds} onChange={(v) => setTagIds(v as number[])} options={tags.map((t) => ({ label: t.name, value: t.id }))} />
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
+              <TbListCheck size={13} /> Subtasks
+            </div>
+            {subtasks.map((s) => (
+              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ flex: 1, fontSize: 13 }}>{s.title}</span>
+                <Button type="text" size="small" icon={<TbX size={13} />} onClick={() => removeSubtask(s.id)} aria-label="Remove subtask" />
+              </div>
+            ))}
+            <div style={{ display: "flex", gap: 6 }}>
+              <Input size="small" placeholder="Add a subtask" value={newSubtask} onChange={(e) => setNewSubtask(e.target.value)} onPressEnter={addSubtask} />
+              <Button size="small" icon={<TbPlus size={14} />} onClick={addSubtask} />
+            </div>
+          </div>
           {dueDate && (
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
