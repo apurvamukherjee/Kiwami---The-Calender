@@ -4,15 +4,21 @@ import { useTokens } from "../../hooks/useTokens";
 import {
   HOUR_H, HourGridLines, NowIndicator, totalHeight, computeHourRange,
   TimeBlock, TimeGridColumn, isToday, layoutDayItems, eventColor,
+  NoteTaskBlock, layoutTimedNoteTasks, type TimedNoteTask,
 } from "./timeGrid";
 import type { CalendarItem } from "./useCalendarEvents";
+import type { NoteDto, TaskDto } from "../../db/types";
 
 const GUTTER = 52;
 
 interface Props {
   rangeStart: string; // Sunday of the visible week
   items: CalendarItem[];
+  notes: NoteDto[];
+  tasks: TaskDto[];
   onTapItem: (item: CalendarItem) => void;
+  onTapNote: (note: NoteDto) => void;
+  onTapTask: (task: TaskDto) => void;
   onCreateAt: (date: string, time: string, endTime: string) => void;
   onSelectDay: (date: string) => void;
 }
@@ -21,7 +27,7 @@ interface Props {
 // not a fixed narrow pixel width) — this is a desktop-optimized calendar
 // surface, not a mobile card scaled up. Header + all-day strip stay fixed
 // above a vertically-scrolling hour grid.
-export function WeekView({ rangeStart, items, onTapItem, onCreateAt, onSelectDay }: Props) {
+export function WeekView({ rangeStart, items, notes, tasks, onTapItem, onTapNote, onTapTask, onCreateAt, onSelectDay }: Props) {
   const tokens = useTokens();
   const dates = useMemo(
     () => Array.from({ length: 7 }, (_, i) => dayjs(rangeStart).add(i, "day").format("YYYY-MM-DD")),
@@ -48,12 +54,64 @@ export function WeekView({ rangeStart, items, onTapItem, onCreateAt, onSelectDay
     return m;
   }, [items, dates]);
 
-  const hasAllDay = dates.some((d) => (allDayByDate.get(d) ?? []).length > 0);
+  // Dated notes/tasks split the same way events are: allDay (or timeless)
+  // ones join the all-day strip, timed ones get positioned in the hour grid.
+  const allDayNotesByDate = useMemo(() => {
+    const m = new Map<string, NoteDto[]>();
+    for (const d of dates) m.set(d, []);
+    for (const n of notes) {
+      if (!n.dueDate || !n.allDay) continue;
+      m.get(n.dueDate.slice(0, 10))?.push(n);
+    }
+    return m;
+  }, [notes, dates]);
+  const timedNotesByDate = useMemo(() => {
+    const m = new Map<string, NoteDto[]>();
+    for (const d of dates) m.set(d, []);
+    for (const n of notes) {
+      if (!n.dueDate || n.allDay) continue;
+      m.get(n.dueDate.slice(0, 10))?.push(n);
+    }
+    return m;
+  }, [notes, dates]);
+  const allDayTasksByDate = useMemo(() => {
+    const m = new Map<string, TaskDto[]>();
+    for (const d of dates) m.set(d, []);
+    for (const t of tasks) {
+      const scheduled = t.doDate ?? t.dueDate;
+      if (!scheduled || !t.allDay) continue;
+      m.get(scheduled.slice(0, 10))?.push(t);
+    }
+    return m;
+  }, [tasks, dates]);
+  const timedTasksByDate = useMemo(() => {
+    const m = new Map<string, TaskDto[]>();
+    for (const d of dates) m.set(d, []);
+    for (const t of tasks) {
+      const scheduled = t.doDate ?? t.dueDate;
+      if (!scheduled || t.allDay) continue;
+      m.get(scheduled.slice(0, 10))?.push(t);
+    }
+    return m;
+  }, [tasks, dates]);
+
+  const hasAllDay = dates.some((d) =>
+    (allDayByDate.get(d) ?? []).length > 0 || (allDayNotesByDate.get(d) ?? []).length > 0 || (allDayTasksByDate.get(d) ?? []).length > 0,
+  );
 
   // One shared hour range across all 7 columns (they must stay aligned on
   // one vertical axis) — expanded past the 5am-11pm default only if some
-  // item this week actually falls outside it.
-  const { startHour, endHour } = useMemo(() => computeHourRange(items), [items]);
+  // item or timed note/task this week actually falls outside it.
+  const extraTimes = useMemo(() => {
+    const times: string[] = [];
+    for (const n of notes) if (n.dueDate && !n.allDay) times.push(n.dueDate.slice(11, 16));
+    for (const t of tasks) {
+      const scheduled = t.doDate ?? t.dueDate;
+      if (scheduled && !t.allDay) times.push(scheduled.slice(11, 16));
+    }
+    return times;
+  }, [notes, tasks]);
+  const { startHour, endHour } = useMemo(() => computeHourRange(items, extraTimes), [items, extraTimes]);
   const totalH = totalHeight(startHour, endHour);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -106,6 +164,31 @@ export function WeekView({ rangeStart, items, onTapItem, onCreateAt, onSelectDay
                   </button>
                 );
               })}
+              {(allDayNotesByDate.get(d) ?? []).map((n) => {
+                const color = n.kind === "reminder" ? tokens.teal : tokens.accent;
+                return (
+                  <button key={`n-${n.id}`} onClick={() => onTapNote(n)} style={{
+                    fontSize: 10, fontWeight: 700, padding: "1px 4px", borderRadius: 4, cursor: "pointer",
+                    background: n.completed ? "var(--border)" : `${color}18`, color: n.completed ? "var(--ink-soft)" : color,
+                    border: `1px dashed ${n.completed ? "var(--ink-soft)" : color}`, textAlign: "left",
+                    textDecoration: n.completed ? "line-through" : "none",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {n.title}
+                  </button>
+                );
+              })}
+              {(allDayTasksByDate.get(d) ?? []).map((t) => (
+                <button key={`t-${t.id}`} onClick={() => onTapTask(t)} style={{
+                  fontSize: 10, fontWeight: 700, padding: "1px 4px", borderRadius: 4, cursor: "pointer",
+                  background: t.completed ? "var(--border)" : `${tokens.accent}18`, color: t.completed ? "var(--ink-soft)" : tokens.accent,
+                  border: `1px dashed ${t.completed ? "var(--ink-soft)" : tokens.accent}`, textAlign: "left",
+                  textDecoration: t.completed ? "line-through" : "none",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {t.title}
+                </button>
+              ))}
             </div>
           ))}
         </div>
@@ -119,6 +202,17 @@ export function WeekView({ rangeStart, items, onTapItem, onCreateAt, onSelectDay
           {dates.map((d) => {
             const dayItems = byDate.get(d) ?? [];
             const layout = layoutDayItems(dayItems);
+            const noteTaskEntries: TimedNoteTask[] = [
+              ...(timedNotesByDate.get(d) ?? []).map((n): TimedNoteTask => ({
+                key: `note-${n.id}`, kind: n.kind, title: n.title, time: n.dueDate!.slice(11, 16),
+                completed: !!n.completed, onTap: () => onTapNote(n),
+              })),
+              ...(timedTasksByDate.get(d) ?? []).map((t): TimedNoteTask => ({
+                key: `task-${t.id}`, kind: "task", title: t.title, time: (t.doDate ?? t.dueDate)!.slice(11, 16),
+                completed: t.completed, onTap: () => onTapTask(t),
+              })),
+            ];
+            const noteTaskLayout = layoutTimedNoteTasks(noteTaskEntries);
             return (
               <TimeGridColumn key={d} date={d} startHour={startHour} endHour={endHour}
                 onCreateAt={onCreateAt} onEmptyTap={() => onSelectDay(d)}
@@ -129,6 +223,13 @@ export function WeekView({ rangeStart, items, onTapItem, onCreateAt, onSelectDay
                   return (
                     <TimeBlock key={`${it.event.id}-${i}`} item={it} startHour={startHour} endHour={endHour} onTap={onTapItem}
                       insetLeft={2} insetRight={2} compact col={pos.col} cols={pos.cols} />
+                  );
+                })}
+                {noteTaskEntries.map((entry) => {
+                  const pos = noteTaskLayout.get(entry.key) ?? { col: 0, cols: 1 };
+                  return (
+                    <NoteTaskBlock key={entry.key} entry={entry} startHour={startHour}
+                      insetLeft={2} insetRight={2} col={pos.col} cols={pos.cols} />
                   );
                 })}
               </TimeGridColumn>

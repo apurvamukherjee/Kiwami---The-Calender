@@ -421,16 +421,40 @@ wired up (Convex is schema-only, no functions), so that's an explicit future
 phase, not this one. Permission is requested lazily, the first time a
 Reminder is actually saved — not on app load.
 
-**Calendar integration**: dated Tasks/Reminders show up in the Calendar
-section too (Agenda + Month only — Week/Day's hourly grid placement for an
-all-day task is a real layout question, left as a v1.1 follow-up), via a
-separate `useNotesForRange` live query passed into `MonthView`/`AgendaView`
-as its own prop — deliberately **not** merged into `useCalendarEvents.ts`'s
+**Calendar integration**: dated Tasks/Reminders show up in every Calendar
+view — Month, Agenda, and (since a later pass — see "Week/Day timed
+note/task placement" below) Week/Day's hourly grid too — via separate
+`useNotesForRange`/`useTasksForRange` live queries passed into each view as
+their own props — deliberately **not** merged into `useCalendarEvents.ts`'s
 `CalendarItem` pipeline, which has 12+18 passing unit tests riding on it.
-Month gets a small teal dot badge (`Popover` listing that day's notes,
+Month gets a small teal dot badge (`Popover` listing that day's notes/tasks,
 same pattern as the existing "+N more" event overflow); Agenda interleaves
-`NoteListItem` rows into its existing per-day groups, tapping either opens
-`NoteEditorSheet` instead of `EventEditorSheet`.
+`NoteListItem`/`TaskAgendaRow` rows into its existing per-day groups, tapping
+either opens `NoteEditorSheet`/`TaskDetailSheet` instead of `EventEditorSheet`.
+
+**Week/Day timed note/task placement**: a dated Task/Reminder with a specific
+time-of-day (`allDay: false`) renders as a real block in Week/Day's hourly
+grid at that time, not just in Month/Agenda — closing the gap this file used
+to flag as a "v1.1 follow-up." All-day ones still join the existing all-day
+strip alongside all-day events. Implemented in `timeGrid.tsx`: `TimeBlock`
+(events) is untouched; a separate `NoteTaskBlock` renders notes/tasks with
+their own dashed-border look (matching `TaskAgendaRow`'s existing dashed-
+border convention) and is tap-only, never draggable — a task/reminder's
+"time" is a due moment, not a duration, and rescheduling one by drag would
+need to write to a different table (`tasks`/`notes`) than `TimeBlock`'s
+`updateEvent`, a bigger feature than this pass needed. Notes/tasks get their
+own independent overlap-avoidance column group (`layoutTimedNoteTasks`),
+deliberately *not* merged with `layoutDayItems`' event columns — merging the
+two would mean an event's column position could shift depending on which
+unrelated tasks happen to be due that day, a bigger behavior change than the
+feature needed. The two systems share one generic algorithm
+(`computeSpanColumns`, extracted from the original `layoutDayItems` with
+identical behavior when no notes/tasks are present) but lay out
+independently, so a task and an event at the exact same time can render
+overlapping rather than mutually avoiding — an accepted, documented
+trade-off, not a bug. `computeHourRange` also takes an `extraTimes` param so
+a task/reminder outside the default 5am–11pm window still pulls the grid
+open, same as an event would.
 
 **Verified**: `npm run typecheck`/`test` (23 tests, up from 18)/`build` all
 clean; a real headless-Chromium pass (Playwright, same globally-installed

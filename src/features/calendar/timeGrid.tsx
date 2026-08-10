@@ -6,7 +6,7 @@
 import { useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode, CSSProperties } from "react";
 import { motion, useDragControls } from "framer-motion";
-import { TbGripVertical, TbRepeat, TbFlame, TbToolsKitchen2 } from "react-icons/tb";
+import { TbGripVertical, TbRepeat, TbFlame, TbToolsKitchen2, TbListCheck, TbBell, TbNote } from "react-icons/tb";
 import { updateEvent } from "../../lib/events";
 import { combineDateTime } from "../../lib/date.utils";
 import { hapticLight } from "../../lib/haptics";
@@ -27,7 +27,9 @@ export function totalHeight(startHour: number, endHour: number): number {
 // event outside it used to just be invisible in Week/Day (it still rendered
 // fine in Month/Agenda, which don't use this grid) — this expands the
 // window, rounded to whole hours, only when something actually needs it.
-export function computeHourRange(items: CalendarItem[]): { startHour: number; endHour: number } {
+// `extraTimes` folds in timed notes/tasks (HH:mm) so a task due before 5am
+// or after 11pm still pulls the grid open, same as an event would.
+export function computeHourRange(items: CalendarItem[], extraTimes: string[] = []): { startHour: number; endHour: number } {
   let startHour = DEFAULT_START_HOUR;
   let endHour = DEFAULT_END_HOUR;
   for (const it of items) {
@@ -40,6 +42,11 @@ export function computeHourRange(items: CalendarItem[]): { startHour: number; en
       endH = em > 0 ? eh + 1 : eh;
     }
     if (endH > endHour) endHour = Math.min(24, endH);
+  }
+  for (const time of extraTimes) {
+    const [h] = time.split(":").map(Number);
+    if (h < startHour) startHour = h;
+    if (h + 1 > endHour) endHour = Math.min(24, h + 1);
   }
   return { startHour, endHour };
 }
@@ -129,20 +136,19 @@ function itemSpan(item: CalendarItem): [number, number] {
 // Google-Calendar-style side-by-side layout for items that overlap in time.
 // Greedy interval partitioning: sort by start, place each in the first
 // column whose last item has already ended, opening a new column otherwise.
-export function layoutDayItems(items: CalendarItem[]): Map<CalendarItem, { col: number; cols: number }> {
-  const withSpans = items
-    .filter((it) => it.event.id != null && !it.event.allDay)
-    .map((it) => ({ it, span: itemSpan(it) }))
-    .sort((a, b) => a.span[0] - b.span[0] || a.span[1] - b.span[1]);
-
-  const result = new Map<CalendarItem, { col: number; cols: number }>();
-  let cluster: typeof withSpans = [];
+// Generic over a string key so both events (layoutDayItems) and timed
+// notes/tasks (layoutTimedNoteTasks) share one algorithm without either
+// needing to know about the other's shape.
+function computeSpanColumns(entries: { key: string; span: [number, number] }[]): Map<string, { col: number; cols: number }> {
+  const sorted = [...entries].sort((a, b) => a.span[0] - b.span[0] || a.span[1] - b.span[1]);
+  const result = new Map<string, { col: number; cols: number }>();
+  let cluster: typeof sorted = [];
   let clusterEnd = -Infinity;
 
   function flush() {
     if (!cluster.length) return;
     const colEnds: number[] = [];
-    const placed: { item: CalendarItem; col: number }[] = [];
+    const placed: { key: string; col: number }[] = [];
     for (const entry of cluster) {
       let col = colEnds.findIndex((end) => end <= entry.span[0]);
       if (col === -1) {
@@ -151,14 +157,14 @@ export function layoutDayItems(items: CalendarItem[]): Map<CalendarItem, { col: 
       } else {
         colEnds[col] = entry.span[1];
       }
-      placed.push({ item: entry.it, col });
+      placed.push({ key: entry.key, col });
     }
     const cols = colEnds.length;
-    for (const { item, col } of placed) result.set(item, { col, cols });
+    for (const { key, col } of placed) result.set(key, { col, cols });
     cluster = [];
   }
 
-  for (const entry of withSpans) {
+  for (const entry of sorted) {
     if (cluster.length === 0 || entry.span[0] < clusterEnd) {
       cluster.push(entry);
       clusterEnd = Math.max(clusterEnd, entry.span[1]);
@@ -170,6 +176,45 @@ export function layoutDayItems(items: CalendarItem[]): Map<CalendarItem, { col: 
   }
   flush();
   return result;
+}
+
+export function layoutDayItems(items: CalendarItem[]): Map<CalendarItem, { col: number; cols: number }> {
+  const withKeys = items
+    .filter((it) => it.event.id != null && !it.event.allDay)
+    .map((it, i) => ({ it, key: `${it.event.id}-${it.date}-${i}`, span: itemSpan(it) }));
+  const cols = computeSpanColumns(withKeys.map(({ key, span }) => ({ key, span })));
+  const result = new Map<CalendarItem, { col: number; cols: number }>();
+  for (const { it, key } of withKeys) {
+    const c = cols.get(key);
+    if (c) result.set(it, c);
+  }
+  return result;
+}
+
+// A dated Task/Reminder rendered at its time-of-day in the hourly grid —
+// deliberately laid out in its own independent column group rather than
+// merged with layoutDayItems' event columns: a real event/task time clash is
+// rare, and merging the two overlap-avoidance systems would mean every event
+// column position could shift depending on which tasks happen to be due that
+// day, which is a bigger behavior change than this feature needs. Notes/tasks
+// render as a slim, dashed-border marker (matching TaskAgendaRow's existing
+// dashed-border convention for a task row) instead of a full-height block.
+export interface TimedNoteTask {
+  key: string; // `note-${id}` / `task-${id}`
+  kind: "note" | "task" | "reminder";
+  title: string;
+  time: string; // HH:mm
+  completed: boolean;
+  onTap: () => void;
+}
+
+export function layoutTimedNoteTasks(entries: TimedNoteTask[]): Map<string, { col: number; cols: number }> {
+  const spans = entries.map((e) => {
+    const [h, m] = e.time.split(":").map(Number);
+    const start = h * 60 + m;
+    return { key: e.key, span: [start, start + 30] as [number, number] };
+  });
+  return computeSpanColumns(spans);
 }
 
 // Wraps one day's grid column. Long-press (400ms) then drag stakes out a
@@ -442,5 +487,58 @@ function ResizeHandle({ item, top, height, startHour, endHour }: {
         cursor: "ns-resize", zIndex: 25, touchAction: "none",
       }}
     />
+  );
+}
+
+interface NoteTaskBlockProps {
+  entry: TimedNoteTask;
+  startHour: number;
+  insetLeft?: number;
+  insetRight?: number;
+  col?: number;
+  cols?: number;
+}
+
+// Tap-only, non-draggable — a task/reminder's "time" is just a due moment,
+// not a duration to resize, and rescheduling one by dragging would need to
+// write back to a different table (tasks/notes) than TimeBlock's updateEvent,
+// a bigger feature than this pass needs. Same "tap to open the editor"
+// treatment recurring events already get in TimeBlock above.
+export function NoteTaskBlock({ entry, startHour, insetLeft = 52, insetRight = 8, col = 0, cols = 1 }: NoteTaskBlockProps) {
+  const tokens = useTokens();
+  const color = entry.kind === "reminder" ? tokens.teal : entry.kind === "note" ? tokens.ash : tokens.accent;
+  const [h, m] = entry.time.split(":").map(Number);
+  const top = (h - startHour) * 60 + m;
+  const Icon = entry.kind === "reminder" ? TbBell : entry.kind === "note" ? TbNote : TbListCheck;
+
+  const leftStyle = cols > 1
+    ? `calc(${insetLeft}px + (100% - ${insetLeft + insetRight}px) * ${col / cols})`
+    : insetLeft;
+  const widthStyle = cols > 1
+    ? `calc((100% - ${insetLeft + insetRight}px) / ${cols} - 3px)`
+    : undefined;
+
+  return (
+    <div
+      onClick={entry.onTap}
+      style={{
+        position: "absolute", top, left: leftStyle, right: cols > 1 ? undefined : insetRight, width: widthStyle,
+        height: 20, zIndex: 3,
+        background: entry.completed ? "var(--border)" : `${color}1c`,
+        borderLeft: `2px dashed ${entry.completed ? "var(--ink-soft)" : color}`,
+        borderRadius: 5, padding: "1px 6px", cursor: "pointer",
+        display: "flex", alignItems: "center", gap: 4, overflow: "hidden",
+        opacity: entry.completed ? 0.55 : 1,
+      }}
+    >
+      <Icon size={10} style={{ color: entry.completed ? "var(--ink-soft)" : color, flexShrink: 0 }} />
+      <div style={{
+        fontSize: 10, fontWeight: 700, color: entry.completed ? "var(--ink-soft)" : color,
+        textDecoration: entry.completed ? "line-through" : "none",
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>
+        {entry.title}
+      </div>
+    </div>
   );
 }

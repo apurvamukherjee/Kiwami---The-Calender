@@ -244,11 +244,13 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
             items={items} notes={notes} tasks={tasks} onTapItem={openEdit} onTapNote={openNote} onTapTask={openCalTask} onSelectDay={selectDay} />
         )}
         {view === "week" && (
-          <WeekView rangeStart={rangeStart} items={items} onTapItem={openEdit}
+          <WeekView rangeStart={rangeStart} items={items} notes={notes} tasks={tasks} onTapItem={openEdit}
+            onTapNote={openNote} onTapTask={openCalTask}
             onCreateAt={(d, t, e) => openCreate(d, t, e)} onSelectDay={selectDay} />
         )}
         {view === "day" && (
-          <DayView date={currentDate} items={items} onTapItem={openEdit}
+          <DayView date={currentDate} items={items} notes={notes} tasks={tasks} onTapItem={openEdit}
+            onTapNote={openNote} onTapTask={openCalTask}
             onCreateAt={(d, t, e) => openCreate(d, t, e)} />
         )}
         {view === "agenda" && <AgendaView items={items} notes={notes} tasks={tasks} onTapItem={openEdit} onTapNote={openNote} onTapTask={openCalTask} />}
