@@ -19,6 +19,7 @@ import { MonthView } from "./MonthView";
 import { WeekView } from "./WeekView";
 import { DayView } from "./DayView";
 import { AgendaView } from "./AgendaView";
+import { TodayView } from "./TodayView";
 import { EventEditorSheet } from "./EventEditorSheet";
 import { RoutineDetailSheet } from "../routines/RoutineDetailSheet";
 import { YearHeatmapSheet } from "../routines/YearHeatmapSheet";
@@ -32,12 +33,14 @@ import { todayKey } from "../../lib/date.utils";
 const NoteFullEditor = lazy(() => import("../notes/NoteFullEditor").then((m) => ({ default: m.NoteFullEditor })));
 
 const DESKTOP_VIEWS = [
+  { label: "Today", value: "today" },
   { label: "Month", value: "month" },
   { label: "Week", value: "week" },
   { label: "Day", value: "day" },
   { label: "Agenda", value: "agenda" },
 ];
 const MOBILE_VIEWS = [
+  { label: "Today", value: "today" },
   { label: "Day", value: "day" },
   { label: "Agenda", value: "agenda" },
 ];
@@ -75,7 +78,10 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
   const taskLists = useTaskLists();
   const taskTags = useTaskTags();
   const eventCount = useLiveQuery(() => db.events.count(), []);
-  const showEmptyState = eventCount === 0;
+  // Today has its own, more accurate empty state (it can be non-empty from
+  // tasks/reminders alone, with zero real calendar events) — this one stays
+  // scoped to the other views, where "0 events" really does mean empty.
+  const showEmptyState = eventCount === 0 && view !== "today";
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CalendarItem | null>(null);
@@ -126,6 +132,7 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
 
   const periodLabel = useMemo(() => {
     const d = dayjs(currentDate);
+    if (view === "today") return "Today";
     if (view === "month") return d.format("MMMM YYYY");
     if (view === "week") {
       const start = dayjs(rangeStart), end = dayjs(rangeEnd);
@@ -138,6 +145,7 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
   }, [view, currentDate, rangeStart, rangeEnd]);
 
   function step(dir: 1 | -1) {
+    if (view === "today") return; // dashboard, not a navigable view — always shows the real today
     if (view === "agenda") {
       setCurrentDate(dayjs(currentDate).add(dir * 30, "day").format("YYYY-MM-DD"));
       return;
@@ -191,22 +199,24 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
         position: "relative", zIndex: 10,
       }} className="safe-top">
         {!isMobile && <SectionTabs section={section} onChange={onChangeSection} />}
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <Button size="small" onClick={() => setCurrentDate(todayKey())}>Today</Button>
-          <Button size="small" type="text" icon={<TbChevronLeft size={16} />} onClick={() => step(-1)} aria-label="Previous period" />
-          <Button size="small" type="text" icon={<TbChevronRight size={16} />} onClick={() => step(1)} aria-label="Next period" />
-          <DatePicker
-            size="small"
-            value={dayjs(currentDate)}
-            onChange={(d) => d && setCurrentDate(d.format("YYYY-MM-DD"))}
-            allowClear={false}
-            inputReadOnly
-            format="D MMM 'YY"
-            style={{ width: 100 }}
-            aria-label="Jump to date"
-            classNames={{ popup: { root: "kiwami-date-dropdown" } }}
-          />
-        </div>
+        {view !== "today" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <Button size="small" onClick={() => setCurrentDate(todayKey())}>Today</Button>
+            <Button size="small" type="text" icon={<TbChevronLeft size={16} />} onClick={() => step(-1)} aria-label="Previous period" />
+            <Button size="small" type="text" icon={<TbChevronRight size={16} />} onClick={() => step(1)} aria-label="Next period" />
+            <DatePicker
+              size="small"
+              value={dayjs(currentDate)}
+              onChange={(d) => d && setCurrentDate(d.format("YYYY-MM-DD"))}
+              allowClear={false}
+              inputReadOnly
+              format="D MMM 'YY"
+              style={{ width: 100 }}
+              aria-label="Jump to date"
+              classNames={{ popup: { root: "kiwami-date-dropdown" } }}
+            />
+          </div>
+        )}
         <div style={{ fontSize: 15, fontWeight: 800, flex: 1, minWidth: 140 }}>{periodLabel}</div>
         <Segmented value={view} onChange={(v) => setView(v as CalendarView)} options={isMobile ? MOBILE_VIEWS : DESKTOP_VIEWS} />
         <Button type="primary" icon={<TbPlus size={15} />} onClick={() => openCreate()}>New</Button>
@@ -238,6 +248,9 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
               </Button>
             </div>
           </div>
+        )}
+        {view === "today" && (
+          <TodayView onTapItem={openEdit} onTapNote={openNote} onTapTask={openCalTask} />
         )}
         {view === "month" && (
           <MonthView rangeStart={rangeStart} rangeEnd={rangeEnd} currentDate={currentDate}

@@ -14,10 +14,30 @@ import { ensureOccurrences } from "../../lib/occurrences";
 export interface CalendarItem {
   event: EventDto;
   rule?: RecurrenceRuleDto;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD — the start date
   time?: string; // HH:mm, undefined when allDay
   endTime?: string; // HH:mm
   occurrenceStatus?: OccurrenceStatusDto; // only present for isRoutine/isFoodSlot events
+  // YYYY-MM-DD, only set for a non-recurring event whose end date falls
+  // after its start date (a multi-day "trip"/"conference" style event).
+  // Recurring events never span — the recurrence engine has no per-
+  // occurrence override, so a spanning *series* would be a much bigger
+  // feature; EventEditorSheet only offers the multi-day toggle for
+  // non-recurring events in the first place. Month/Week render this as a
+  // continuous bar instead of a per-day pill; Day/Agenda/TodayView treat
+  // any date within [date, spanEndDate] as "showing" this item via
+  // isItemOnDate below.
+  spanEndDate?: string;
+}
+
+// True when `date` falls anywhere within this item's span (a single day for
+// a normal item, since spanEndDate defaults to `date` itself).
+export function isItemOnDate(item: CalendarItem, date: string): boolean {
+  return date >= item.date && date <= (item.spanEndDate ?? item.date);
+}
+
+export function isSpanningItem(item: CalendarItem): boolean {
+  return !!item.spanEndDate && item.spanEndDate !== item.date;
 }
 
 export function useCalendarEvents(rangeStart: string, rangeEnd: string): CalendarItem[] {
@@ -57,11 +77,20 @@ export function useCalendarEvents(rangeStart: string, rangeEnd: string): Calenda
             occurrenceStatus: tracked ? statusByKey.get(`${event.id}|${date}`) : undefined,
           });
         }
-      } else if (anchorDate >= rangeStart && anchorDate <= rangeEnd) {
-        items.push({
-          event, date: anchorDate, time, endTime,
-          occurrenceStatus: tracked ? statusByKey.get(`${event.id}|${anchorDate}`) : undefined,
-        });
+      } else {
+        // A spanning event's start can be well before the visible range
+        // (e.g. a trip that began last month, still ongoing) — include it
+        // whenever its [anchorDate, spanEndDate] span overlaps the range at
+        // all, not just when anchorDate itself falls inside it.
+        const endDateOnly = event.endTime?.slice(0, 10);
+        const spanEndDate = endDateOnly && endDateOnly > anchorDate ? endDateOnly : undefined;
+        const itemSpanEnd = spanEndDate ?? anchorDate;
+        if (itemSpanEnd >= rangeStart && anchorDate <= rangeEnd) {
+          items.push({
+            event, date: anchorDate, time, endTime, spanEndDate,
+            occurrenceStatus: tracked ? statusByKey.get(`${event.id}|${anchorDate}`) : undefined,
+          });
+        }
       }
     }
     return items.sort((a, b) =>

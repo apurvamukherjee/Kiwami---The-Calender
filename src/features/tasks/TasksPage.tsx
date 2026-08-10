@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import dayjs from "dayjs";
-import { Button, Input } from "antd";
-import { TbArchive, TbListDetails, TbTags, TbFlame, TbTarget, TbChartBar } from "react-icons/tb";
+import { Button, Input, Segmented, Switch } from "antd";
+import { TbArchive, TbListDetails, TbTags, TbFlame, TbTarget, TbChartBar, TbRepeat, TbSun } from "react-icons/tb";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useTokens } from "../../hooks/useTokens";
 import { SectionTabs } from "../../components/SectionTabs";
@@ -14,8 +14,14 @@ import { TaskTagManager } from "./TaskTagManager";
 import { TaskArchiveView } from "./TaskArchiveView";
 import { FocusSheet } from "./FocusSheet";
 import { WeeklyReviewSheet } from "./WeeklyReviewSheet";
-import { useTasks, useTaskLists, useTaskTags, ensureDefaultTaskLists, groupTasksByList } from "../../lib/tasks";
+import { useTasks, useTaskLists, useTaskTags, ensureDefaultTaskLists, groupTasksByList, type TaskScopeFilter } from "../../lib/tasks";
 import type { TaskDto } from "../../db/types";
+
+const SCOPE_OPTIONS = [
+  { label: <span style={{ display: "flex", alignItems: "center", gap: 4 }}><TbSun size={13} /> Today</span>, value: "today" },
+  { label: <span style={{ display: "flex", alignItems: "center", gap: 4 }}><TbRepeat size={13} /> Recurring</span>, value: "recurring" },
+  { label: "All", value: "all" },
+];
 
 interface Props {
   section: Section;
@@ -50,6 +56,12 @@ export function TasksPage({
   const [focusOpen, setFocusOpen] = useState(false);
   const [weeklyReviewOpen, setWeeklyReviewOpen] = useState(false);
   const composerRef = useRef<ComponentRef<typeof Input.TextArea>>(null);
+  // Board-view filter, separate from FocusSheet's own tier/energy logic below
+  // (FocusSheet keeps reading the full, unfiltered `tasks`) — defaults to
+  // "today's plate, done stuff hidden" per the user's ask; both are one tap
+  // away from "All"/"show completed" when a full-board view is wanted.
+  const [scope, setScope] = useState<TaskScopeFilter>("today");
+  const [hideCompleted, setHideCompleted] = useState(true);
 
   useEffect(() => {
     void ensureDefaultTaskLists();
@@ -157,13 +169,24 @@ export function TasksPage({
 
       <TaskComposer lists={lists} tags={tags} textAreaRef={composerRef} />
 
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+        padding: "8px 16px", borderBottom: "1px solid var(--border)", flexWrap: "wrap", flexShrink: 0,
+      }}>
+        <Segmented size="small" value={scope} onChange={(v) => setScope(v as TaskScopeFilter)} options={SCOPE_OPTIONS} />
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>Show completed</span>
+          <Switch size="small" checked={!hideCompleted} onChange={(v) => setHideCompleted(!v)} />
+        </div>
+      </div>
+
       <div style={{ flex: 1, minHeight: 0 }}>
         {lists.length === 0 ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--ink-soft)", fontSize: 13 }}>
             Setting up your board…
           </div>
         ) : (
-          <KanbanBoard lists={lists} grouped={grouped} tasksById={tasksById} tags={tags} onOpenTask={openTask} />
+          <KanbanBoard lists={lists} grouped={grouped} tasksById={tasksById} tags={tags} onOpenTask={openTask} scope={scope} hideCompleted={hideCompleted} />
         )}
       </div>
 

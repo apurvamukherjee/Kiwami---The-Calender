@@ -94,7 +94,7 @@ src/
                               Week/Day. Long-press-then-drag to create/move, bottom-edge
                               resize handle. Recurring items are tap-only, not draggable
                               (see "Known architectural decisions").
-      MonthView.tsx, WeekView.tsx, DayView.tsx, AgendaView.tsx
+      MonthView.tsx, WeekView.tsx, DayView.tsx, AgendaView.tsx, TodayView.tsx
       CalendarPage.tsx        The app shell: toolbar (view switcher, date nav, New,
                               Settings) + active view + all sheets
       EventEditorSheet.tsx    Create/edit: title/time/recurrence/type/color/location
@@ -539,3 +539,101 @@ applying Title/Heading/Body block styles, bold, checklist (`<li
 data-checked>`), and color (verified via `span[style*="color"]` in the
 DOM) all produce correct markup; closing and reopening the note from the
 gallery round-trips the saved HTML correctly; zero console errors.
+
+## Phase 6 — Today dashboard, multi-day events, Tasks board filters (2026-08-10)
+
+Three independent asks, tackled together: a single "what does today look
+like" view, real multi-day/spanning events, and decluttering the Kanban
+board around what's actually actionable now.
+
+**Today dashboard** (`features/calendar/TodayView.tsx`) — merges routines,
+food slots, plain events, dated tasks, and reminders into one screen,
+grouped into sections (only rendered if non-empty) with a "Nothing on your
+plate today" empty state. Folded into `CalendarPage`'s existing view
+switcher as a 5th option (`CalendarView` gained `"today"`) rather than a
+new top-level nav section — it's a lens on data the app already has three
+separate pages for, not a new data domain. Deliberately **self-querying**
+(`useCalendarEvents(today, today)` + its own `useTasks()`/`useNotes()`
+calls) instead of reusing `CalendarPage`'s range-bound `items`/`notes`/
+`tasks` props, since those are bound to whatever `[rangeStart, rangeEnd]`
+the *previously* active view computed and would miss overdue tasks/
+reminders sitting before that window. A task/reminder counts as "on the
+plate" if it's due today (shown even once completed, dimmed — vanishing
+the instant it's checked off would read as data loss) or overdue-and-still-
+open; undated backlog tasks stay Tasks-board-only. Because it's a
+dashboard, not a navigable view, `CalendarPage.step()` no-ops for it and
+the toolbar hides its prev/next/date-picker cluster — Today always shows
+the real current date, never `currentDate`. It also has its own accurate
+empty state, so `CalendarPage`'s existing `eventCount === 0` "Nothing here
+yet" overlay (gated on real calendar events only) is suppressed while this
+view is active — otherwise it would float over a Today screen that's
+genuinely non-empty from tasks/reminders alone.
+
+**Multi-day / spanning events** — `EventEditorSheet` gained a "Multi-day"
+toggle + end-date field, offered only when `allDay` is true and the event
+is non-recurring (`repeat === "none"`). Recurring events can never span:
+the recurrence engine has no per-occurrence override (see "Known
+architectural decisions" above), so a spanning *series* would be a
+materially bigger feature this pass didn't take on — confirmed with the
+user up front rather than assumed. `CalendarItem` (`useCalendarEvents.ts`)
+gained `spanEndDate?: string`, computed only for non-recurring events whose
+`endTime`'s date is later than its `startTime`'s date; a real bug was
+fixed in the same pass — the old inclusion check
+(`anchorDate >= rangeStart && anchorDate <= rangeEnd`) would have silently
+dropped a spanning event whose *start* fell before the visible range even
+if it was still ongoing, so it's now a proper range-overlap check. Two new
+exports, `isItemOnDate`/`isSpanningItem`, are the single shared way every
+view answers "does this item show on date X":
+- **Month** (`MonthView.tsx`): renders a real continuous bar per week-row
+  instead of a per-day pill, clipping a span to each week-row it crosses
+  (a 10-day trip → two bar segments, Google-Calendar style) and stacking
+  overlapping bars via `computeSpanColumns` — the *same* greedy interval-
+  partitioning algorithm `timeGrid.tsx` already used for overlapping timed
+  events, reused with day-columns standing in for minutes and `col`
+  repurposed as a vertical stack index. Bars are a `position:absolute`
+  percentage-positioned overlay sibling to the untouched day-cell grid
+  (not participating in CSS Grid auto-placement), so the existing pill/
+  popover logic has zero behavior change when no spanning events exist.
+  Day cells reserve `paddingTop` for the tallest stack in the *whole
+  month* (not per-row) — a deliberate simplification that costs nothing
+  extra, since `gridTemplateRows: repeat(weekRows, 1fr)` already forces
+  every week row to the same height regardless of content.
+- **Week** (`WeekView.tsx`): same `computeSpanColumns` stacking, but placed
+  via native CSS Grid `gridColumn`/`gridRow` spanning instead of absolute
+  positioning — simpler when there's only one row (the visible week) to
+  place into, since the all-day strip is already a `repeat(7, 1fr)` grid.
+- **Day/Agenda**: no bar (nothing to span across in a single column) — a
+  spanning item just shows in the all-day strip on every date within
+  range via `isItemOnDate`, with a small "10 Aug – 13 Aug" hint in Day;
+  Agenda repeats the same row into every day-group it covers rather than
+  a "Day N of M" label.
+
+**Tasks board filters** (`TasksPage.tsx`/`KanbanBoard.tsx`/
+`TaskColumn.tsx`) — a `Segmented` scope filter (**Today** default |
+Recurring | All) plus a "Show completed" switch (off by default), closing
+the gap where every column showed everything, done or not, forever.
+`taskMatchesFilter` (`lib/tasks.ts`) is the single predicate both the
+board and its mobile per-list count pills use; "today" scope excludes
+recurring tasks (they get their own lens) and anything dated strictly
+after today, but keeps undated/overdue/due-today tasks — a Kanban board's
+undated backlog cards are still "on the plate", not exiled to a date-based
+view. Filtering is deliberately applied **only at the render level** inside
+`TaskColumn` (skip → `return null`) rather than upstream before
+`groupTasksByList` — `SortableContext`'s `items` and `KanbanBoard`'s
+`columns` state keep the column's *full* unfiltered id list, so
+`reorderBoard`'s eventual write never renumbers a filtered subset's
+0..N-1 and clobbers a hidden task's relative order. `FocusSheet`/
+`WeeklyReviewSheet`/`TaskDetailSheet`/`TaskArchiveView` all keep reading
+the full, unfiltered `tasks` list from `TasksPage` — this filter is a
+board-view concern only, not a data-scoping one.
+
+**Verified**: `npm run typecheck`/`test` (34 tests)/`build` all clean. A
+real headless-Chromium pass created a 4-day spanning all-day event and
+confirmed a continuous bar in Month (correctly clipped to Mon–Thu, stopping
+before Fri) and Week, the "2026-08-10 – 2026-08-13" hint in Day, and the
+row repeating across all 4 day-groups in Agenda; confirmed the Today
+dashboard correctly surfaces a same-day task and reminder created from the
+Notes composer; confirmed the Tasks board's default Today+hide-completed
+view, the "N done today" badge, and the completed task reappearing
+(struck through) the instant "Show completed" is toggled on — zero console
+errors throughout.

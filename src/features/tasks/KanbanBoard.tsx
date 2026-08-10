@@ -17,7 +17,8 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates, arrayMove } from "@dnd-kit/sortable";
 import { useIsMobile } from "../../hooks/useIsMobile";
-import { reorderBoard } from "../../lib/tasks";
+import { reorderBoard, taskMatchesFilter, type TaskScopeFilter } from "../../lib/tasks";
+import { todayKey } from "../../lib/date.utils";
 import { TaskColumn } from "./TaskColumn";
 import { TaskCardOverlay } from "./TaskCard";
 import { parseDndId } from "./taskDnd";
@@ -35,9 +36,11 @@ interface Props {
   tasksById: Map<number, TaskDto>;
   tags: TaskTagDto[];
   onOpenTask: (id: number) => void;
+  scope: TaskScopeFilter;
+  hideCompleted: boolean;
 }
 
-export function KanbanBoard({ lists, grouped, tasksById, tags, onOpenTask }: Props) {
+export function KanbanBoard({ lists, grouped, tasksById, tags, onOpenTask, scope, hideCompleted }: Props) {
   // useIsMobile's query is `max-width: ${breakpoint}px` (inclusive) — passing
   // DESKTOP_BREAKPOINT directly would make a viewport at exactly 1440px match
   // "mobile" and render the single-column board instead of the intended
@@ -149,9 +152,9 @@ export function KanbanBoard({ lists, grouped, tasksById, tags, onOpenTask }: Pro
   return (
     <DndContext sensors={sensors} collisionDetection={collisionDetectionStrategy} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
       {isDesktop ? (
-        <DesktopBoard lists={lists} columns={columns} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} dragActive={dragActive} />
+        <DesktopBoard lists={lists} columns={columns} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} dragActive={dragActive} scope={scope} hideCompleted={hideCompleted} />
       ) : (
-        <MobileBoard lists={lists} columns={columns} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} dragActive={dragActive} />
+        <MobileBoard lists={lists} columns={columns} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} dragActive={dragActive} scope={scope} hideCompleted={hideCompleted} />
       )}
       <DragOverlay>{activeTask ? <TaskCardOverlay task={activeTask} tags={tags} /> : null}</DragOverlay>
     </DndContext>
@@ -165,9 +168,20 @@ interface BoardProps {
   tags: TaskTagDto[];
   onOpenTask: (id: number) => void;
   dragActive: boolean;
+  scope: TaskScopeFilter;
+  hideCompleted: boolean;
 }
 
-function DesktopBoard({ lists, columns, tasksById, tags, onOpenTask, dragActive }: BoardProps) {
+function visibleCount(ids: number[], tasksById: Map<number, TaskDto>, scope: TaskScopeFilter, hideCompleted: boolean, today: string): number {
+  let n = 0;
+  for (const id of ids) {
+    const t = tasksById.get(id);
+    if (t && taskMatchesFilter(t, scope, hideCompleted, today)) n++;
+  }
+  return n;
+}
+
+function DesktopBoard({ lists, columns, tasksById, tags, onOpenTask, dragActive, scope, hideCompleted }: BoardProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [overflowing, setOverflowing] = useState(false);
 
@@ -186,7 +200,7 @@ function DesktopBoard({ lists, columns, tasksById, tags, onOpenTask, dragActive 
       <div ref={scrollRef} style={{ display: "flex", gap: 12, padding: 12, height: "100%", overflowX: "auto" }}>
         {lists.map((list) => (
           <div key={list.id} style={{ width: 300, flexShrink: 0, height: "100%" }}>
-            <TaskColumn list={list} taskIds={columns[list.id!] ?? []} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} dragActive={dragActive} />
+            <TaskColumn list={list} taskIds={columns[list.id!] ?? []} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} dragActive={dragActive} scope={scope} hideCompleted={hideCompleted} />
           </div>
         ))}
       </div>
@@ -211,9 +225,10 @@ function DesktopBoard({ lists, columns, tasksById, tags, onOpenTask, dragActive 
 // documented #1 Trello-mobile complaint). Card drag is a physically separate gesture
 // channel from this scroll (see KanbanBoard's TouchSensor delay), so a fast flick
 // scrolls between columns while a press-and-hold on a card picks it up.
-function MobileBoard({ lists, columns, tasksById, tags, onOpenTask, dragActive }: BoardProps) {
+function MobileBoard({ lists, columns, tasksById, tags, onOpenTask, dragActive, scope, hideCompleted }: BoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIdx, setActiveIdx] = useState(0);
+  const today = todayKey();
 
   function scrollToIndex(i: number) {
     const el = containerRef.current;
@@ -251,7 +266,7 @@ function MobileBoard({ lists, columns, tasksById, tags, onOpenTask, dragActive }
               color: i === activeIdx ? "#fff" : "var(--ink)",
             }}
           >
-            {list.name} <span style={{ opacity: 0.75 }}>{(columns[list.id!] ?? []).length}</span>
+            {list.name} <span style={{ opacity: 0.75 }}>{visibleCount(columns[list.id!] ?? [], tasksById, scope, hideCompleted, today)}</span>
           </button>
           );
         })}
@@ -259,7 +274,7 @@ function MobileBoard({ lists, columns, tasksById, tags, onOpenTask, dragActive }
       <div ref={containerRef} onScroll={onScroll} style={{ display: "flex", flex: 1, minHeight: 0, overflowX: "auto", scrollSnapType: "x mandatory" }}>
         {lists.map((list) => (
           <div key={list.id} style={{ flex: "0 0 100%", scrollSnapAlign: "start", minWidth: 0, height: "100%", padding: 8 }}>
-            <TaskColumn list={list} taskIds={columns[list.id!] ?? []} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} dragActive={dragActive} />
+            <TaskColumn list={list} taskIds={columns[list.id!] ?? []} tasksById={tasksById} tags={tags} onOpenTask={onOpenTask} dragActive={dragActive} scope={scope} hideCompleted={hideCompleted} />
           </div>
         ))}
       </div>

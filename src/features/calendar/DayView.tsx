@@ -6,6 +6,7 @@ import {
   TimeBlock, TimeGridColumn, layoutDayItems, eventColor,
   NoteTaskBlock, layoutTimedNoteTasks, type TimedNoteTask,
 } from "./timeGrid";
+import { isItemOnDate, isSpanningItem } from "./useCalendarEvents";
 import type { CalendarItem } from "./useCalendarEvents";
 import type { NoteDto, TaskDto } from "../../db/types";
 
@@ -27,8 +28,11 @@ interface Props {
 // gets to breathe.
 export function DayView({ date, items, notes, tasks, onTapItem, onTapNote, onTapTask, onCreateAt }: Props) {
   const tokens = useTokens();
-  const dayItems = useMemo(() => items.filter((it) => it.date === date && !it.event.allDay), [items, date]);
-  const allDayItems = useMemo(() => items.filter((it) => it.date === date && it.event.allDay), [items, date]);
+  // A multi-day event shows in the all-day strip on every date within its
+  // span, same as a real all-day event — isItemOnDate handles the range
+  // containment check (a no-op for normal single-day items).
+  const dayItems = useMemo(() => items.filter((it) => isItemOnDate(it, date) && !it.event.allDay && !isSpanningItem(it)), [items, date]);
+  const allDayItems = useMemo(() => items.filter((it) => isItemOnDate(it, date) && (it.event.allDay || isSpanningItem(it))), [items, date]);
   const dayNotes = useMemo(() => notes.filter((n) => n.dueDate?.slice(0, 10) === date), [notes, date]);
   const dayTasks = useMemo(() => tasks.filter((t) => (t.doDate ?? t.dueDate)?.slice(0, 10) === date), [tasks, date]);
   const allDayNotes = useMemo(() => dayNotes.filter((n) => n.allDay), [dayNotes]);
@@ -74,6 +78,7 @@ export function DayView({ date, items, notes, tasks, onTapItem, onTapNote, onTap
                 background: `${color}22`, color, textAlign: "left", width: "fit-content",
               }}>
                 {it.event.title}
+                {isSpanningItem(it) && <span style={{ fontWeight: 500, opacity: 0.75 }}> · {it.date} – {it.spanEndDate}</span>}
               </button>
             );
           })}

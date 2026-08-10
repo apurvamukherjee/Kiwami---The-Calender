@@ -8,6 +8,7 @@ import { EmberChain } from "../../components/EmberChain";
 import { useRecentBeads } from "../routines/useRoutineStreak";
 import { NoteListItem } from "../notes/NoteListItem";
 import { TaskAgendaRow } from "../tasks/TaskAgendaRow";
+import { isSpanningItem } from "./useCalendarEvents";
 import type { CalendarItem } from "./useCalendarEvents";
 import type { NoteDto, TaskDto } from "../../db/types";
 
@@ -71,6 +72,22 @@ export function AgendaView({ items, notes, tasks, onTapItem, onTapNote, onTapTas
   const groups = useMemo(() => {
     const map = new Map<string, CalendarItem[]>();
     for (const it of items) {
+      // A multi-day event repeats into every day-group it spans (matching
+      // how a real all-day event already shows up once per its own day) —
+      // simpler than a "Day N of M" label, and consistent with how Day/
+      // Week's all-day strip also surfaces it on each date within range.
+      if (isSpanningItem(it)) {
+        let d = dayjs(it.date);
+        const end = dayjs(it.spanEndDate);
+        while (!d.isAfter(end)) {
+          const key = d.format("YYYY-MM-DD");
+          const arr = map.get(key);
+          if (arr) arr.push(it);
+          else map.set(key, [it]);
+          d = d.add(1, "day");
+        }
+        continue;
+      }
       const arr = map.get(it.date);
       if (arr) arr.push(it);
       else map.set(it.date, [it]);

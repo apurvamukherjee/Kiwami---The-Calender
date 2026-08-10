@@ -49,6 +49,13 @@ export function EventEditorSheet({ open, onClose, item, defaultDate, defaultTime
   const [customUnit, setCustomUnit] = useState<"day" | "week">("day");
   const [hasEndDate, setHasEndDate] = useState(false);
   const [endDate, setEndDate] = useState(todayKey());
+  // Multi-day span (a distinct concept from the recurrence "ends on a date"
+  // above) — only offered for all-day, non-recurring events. Recurring
+  // events never span: the recurrence engine has no per-occurrence time/date
+  // override, so a spanning *series* is a materially bigger feature this
+  // pass deliberately doesn't take on.
+  const [multiDay, setMultiDay] = useState(false);
+  const [spanEndDate, setSpanEndDate] = useState(todayKey());
 
   useEffect(() => {
     if (!open) return;
@@ -71,6 +78,14 @@ export function EventEditorSheet({ open, onClose, item, defaultDate, defaultTime
       setCustomUnit(rule?.customUnit ?? "day");
       setHasEndDate(!!rule?.endDate);
       setEndDate(rule?.endDate ?? todayKey());
+      const endDateOnly = event.allDay ? event.endTime?.slice(0, 10) : undefined;
+      if (endDateOnly && endDateOnly > item.date) {
+        setMultiDay(true);
+        setSpanEndDate(endDateOnly);
+      } else {
+        setMultiDay(false);
+        setSpanEndDate(todayKey());
+      }
     } else {
       setTitle("");
       setDescription("");
@@ -89,6 +104,8 @@ export function EventEditorSheet({ open, onClose, item, defaultDate, defaultTime
       setCustomUnit("day");
       setHasEndDate(false);
       setEndDate(todayKey());
+      setMultiDay(false);
+      setSpanEndDate(defaultDate ?? todayKey());
     }
   }, [open, item, defaultDate, defaultTime, defaultEndTime]);
 
@@ -101,7 +118,9 @@ export function EventEditorSheet({ open, onClose, item, defaultDate, defaultTime
   async function handleSave() {
     if (!title.trim()) return;
     const startTime = combineDateTime(date, allDay ? "00:00" : time);
-    const finalEndTime = !allDay && hasEnd ? combineDateTime(date, endTime) : undefined;
+    const finalEndTime = allDay && multiDay && spanEndDate > date
+      ? combineDateTime(spanEndDate, "23:59")
+      : !allDay && hasEnd ? combineDateTime(date, endTime) : undefined;
 
     const patch = {
       title: title.trim(),
@@ -178,6 +197,22 @@ export function EventEditorSheet({ open, onClose, item, defaultDate, defaultTime
           <span style={{ fontSize: 13, fontWeight: 600 }}>All-day</span>
           <Switch size="small" checked={allDay} onChange={setAllDay} />
         </div>
+
+        {allDay && repeat === "none" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Multi-day</span>
+              <Switch size="small" checked={multiDay} onChange={setMultiDay} />
+            </div>
+            {multiDay && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>Ends</span>
+                <input type="date" value={spanEndDate} min={date} onChange={(e) => setSpanEndDate(e.target.value)}
+                  style={{ padding: 8, borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--ink)" }} />
+              </div>
+            )}
+          </>
+        )}
 
         {!allDay && (
           <>

@@ -138,8 +138,12 @@ function itemSpan(item: CalendarItem): [number, number] {
 // column whose last item has already ended, opening a new column otherwise.
 // Generic over a string key so both events (layoutDayItems) and timed
 // notes/tasks (layoutTimedNoteTasks) share one algorithm without either
-// needing to know about the other's shape.
-function computeSpanColumns(entries: { key: string; span: [number, number] }[]): Map<string, { col: number; cols: number }> {
+// needing to know about the other's shape. Exported — MonthView.tsx reuses
+// it too, for stacking overlapping multi-day event bars within a week row
+// (same greedy interval-partitioning problem, just day-columns instead of
+// minutes; `col` becomes a vertical stack index there rather than a
+// horizontal column).
+export function computeSpanColumns(entries: { key: string; span: [number, number] }[]): Map<string, { col: number; cols: number }> {
   const sorted = [...entries].sort((a, b) => a.span[0] - b.span[0] || a.span[1] - b.span[1]);
   const result = new Map<string, { col: number; cols: number }>();
   let cluster: typeof sorted = [];

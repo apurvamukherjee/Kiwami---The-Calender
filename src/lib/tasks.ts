@@ -7,6 +7,27 @@ import { getDeviceId } from "./deviceId";
 import { rollTaskDueDateForward } from "./taskRecurrence";
 import type { TaskDto, TaskListDto, TaskTagDto, TaskPriority, TaskRecurrenceDto, TaskSubtaskDto } from "../db/types";
 
+export type TaskScopeFilter = "today" | "recurring" | "all";
+
+// Board-level view filter (TasksPage's toolbar) — deliberately separate from
+// FocusSheet's own tier()/energy logic, which keeps operating on the full,
+// unfiltered task list. `hideCompleted` also hides `wontDo`, matching
+// TaskCard's existing "resolved" grouping (`dimmed = completed || wontDo`).
+// "today" scope excludes recurring tasks (they get their own lens) and any
+// task dated strictly after today; undated/overdue/due-today tasks all count
+// as "on the plate".
+export function taskMatchesFilter(task: TaskDto, scope: TaskScopeFilter, hideCompleted: boolean, today: string): boolean {
+  if (hideCompleted && (task.completed || task.wontDo)) return false;
+  if (scope === "recurring") return !!task.recurrence;
+  if (scope === "today") {
+    if (task.recurrence) return false;
+    const scheduled = (task.doDate ?? task.dueDate)?.slice(0, 10);
+    if (scheduled && scheduled > today) return false;
+    return true;
+  }
+  return true;
+}
+
 export const PRIORITY_ORDER: Record<TaskPriority, number> = { none: 0, low: 1, medium: 2, high: 3, urgent: 4 };
 export const PRIORITY_LABEL: Record<TaskPriority, string> = { none: "None", low: "Low", medium: "Medium", high: "High", urgent: "Urgent" };
 // Keys into useTokens()'s palette — never "diamond" (reserved exclusively for streak milestones).

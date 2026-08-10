@@ -3,13 +3,15 @@ import dayjs from "dayjs";
 import { useTokens } from "../../hooks/useTokens";
 import {
   HOUR_H, HourGridLines, NowIndicator, totalHeight, computeHourRange,
-  TimeBlock, TimeGridColumn, isToday, layoutDayItems, eventColor,
+  TimeBlock, TimeGridColumn, isToday, layoutDayItems, eventColor, computeSpanColumns,
   NoteTaskBlock, layoutTimedNoteTasks, type TimedNoteTask,
 } from "./timeGrid";
+import { isSpanningItem } from "./useCalendarEvents";
 import type { CalendarItem } from "./useCalendarEvents";
 import type { NoteDto, TaskDto } from "../../db/types";
 
 const GUTTER = 52;
+const SPAN_BAR_H = 20;
 
 interface Props {
   rangeStart: string; // Sunday of the visible week
@@ -38,20 +40,55 @@ export function WeekView({ rangeStart, items, notes, tasks, onTapItem, onTapNote
     const m = new Map<string, CalendarItem[]>();
     for (const d of dates) m.set(d, []);
     for (const it of items) {
-      if (it.event.allDay) continue;
+      if (it.event.allDay || isSpanningItem(it)) continue;
       m.get(it.date)?.push(it);
     }
     return m;
   }, [items, dates]);
 
+  // Multi-day events get their own continuous bar row (below) instead of a
+  // per-day pill here — excluded so they don't also duplicate into every
+  // day's own pill stack.
   const allDayByDate = useMemo(() => {
     const m = new Map<string, CalendarItem[]>();
     for (const d of dates) m.set(d, []);
     for (const it of items) {
-      if (!it.event.allDay) continue;
+      if (!it.event.allDay || isSpanningItem(it)) continue;
       m.get(it.date)?.push(it);
     }
     return m;
+  }, [items, dates]);
+
+  // Clip every spanning event to this visible week and stack overlapping
+  // ones — same computeSpanColumns algorithm MonthView reuses for its own
+  // week-row bars, just for a single week here so no per-row grouping is
+  // needed. Placed via native CSS Grid column/row spanning (the all-day
+  // strip is already a `${GUTTER}px repeat(7,1fr)` grid) rather than
+  // percentage-based absolute positioning — simpler when there's only one
+  // row to place into.
+  const spanBars = useMemo(() => {
+    const weekStart = dates[0];
+    const weekEnd = dates[6];
+    const bars: { key: string; item: CalendarItem; startCol: number; endCol: number }[] = [];
+    for (const it of items) {
+      if (!isSpanningItem(it)) continue;
+      const clippedStart = it.date > weekStart ? it.date : weekStart;
+      const clippedEnd = it.spanEndDate! < weekEnd ? it.spanEndDate! : weekEnd;
+      if (clippedStart > clippedEnd) continue;
+      bars.push({
+        key: `${it.event.id}`, item: it,
+        startCol: dayjs(clippedStart).diff(weekStart, "day"),
+        endCol: dayjs(clippedEnd).diff(weekStart, "day"),
+      });
+    }
+    const cols = computeSpanColumns(bars.map((b) => ({ key: b.key, span: [b.startCol, b.endCol + 1] })));
+    let maxStack = 0;
+    const placed = bars.map((b) => {
+      const stackRow = cols.get(b.key)?.col ?? 0;
+      maxStack = Math.max(maxStack, stackRow + 1);
+      return { bar: b, stackRow };
+    });
+    return { bars: placed, maxStack };
   }, [items, dates]);
 
   // Dated notes/tasks split the same way events are: allDay (or timeless)
@@ -146,6 +183,34 @@ export function WeekView({ rangeStart, items, notes, tasks, onTapItem, onTapNote
           );
         })}
       </div>
+
+      {spanBars.bars.length > 0 && (
+        <div style={{
+          display: "grid", gridTemplateColumns: `${GUTTER}px repeat(7, 1fr)`,
+          gridAutoRows: SPAN_BAR_H, gap: 2, borderBottom: "1px solid var(--border)", padding: "3px 0",
+        }}>
+          <div />
+          {spanBars.bars.map(({ bar, stackRow }) => {
+            const color = eventColor(bar.item.event, tokens);
+            return (
+              <div
+                key={bar.key}
+                onClick={() => onTapItem(bar.item)}
+                title={bar.item.event.title}
+                style={{
+                  gridColumn: `${bar.startCol + 2} / ${bar.endCol + 3}`,
+                  gridRow: stackRow + 1,
+                  fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, cursor: "pointer",
+                  background: color, color: "#fff", lineHeight: `${SPAN_BAR_H - 4}px`,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}
+              >
+                {bar.item.event.title}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {hasAllDay && (
         <div style={{ display: "grid", gridTemplateColumns: `${GUTTER}px repeat(7, 1fr)`, borderBottom: "1px solid var(--border)", padding: "3px 0" }}>

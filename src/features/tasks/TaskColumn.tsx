@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Input, Button } from "antd";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { TbPlus, TbListCheck } from "react-icons/tb";
-import { createTask } from "../../lib/tasks";
+import { createTask, taskMatchesFilter, type TaskScopeFilter } from "../../lib/tasks";
 import { parseNoteText } from "../../lib/parseNoteText";
+import { todayKey } from "../../lib/date.utils";
 import { useTokens } from "../../hooks/useTokens";
 import { TaskCard } from "./TaskCard";
 import { listDndId, taskDndId } from "./taskDnd";
@@ -18,15 +19,32 @@ interface Props {
   tags: TaskTagDto[];
   onOpenTask: (id: number) => void;
   dragActive: boolean;
+  scope: TaskScopeFilter;
+  hideCompleted: boolean;
 }
 
-export function TaskColumn({ list, taskIds, tasksById, tags, onOpenTask, dragActive }: Props) {
+export function TaskColumn({ list, taskIds, tasksById, tags, onOpenTask, dragActive, scope, hideCompleted }: Props) {
   const tokens = useTokens();
   const { setNodeRef, isOver } = useDroppable({ id: listDndId(list.id!) });
   const [addOpen, setAddOpen] = useState(false);
   const [addText, setAddText] = useState("");
   const [cleared, setCleared] = useState(false);
   const prevActiveCount = useRef<number | null>(null);
+  const today = todayKey();
+
+  // `taskIds` stays the column's FULL, unfiltered id list — SortableContext
+  // below needs every id for correct drag-reorder math, and reorderBoard's
+  // eventual write (KanbanBoard's `columns` state) is built from the same
+  // unfiltered `grouped` map. Only rendering is scoped by the toolbar filter
+  // (visibleIds), so hidden tasks' relative order never gets clobbered by a
+  // filtered subset's 0..N-1 renumbering.
+  const visibleIds = useMemo(
+    () => taskIds.filter((id) => {
+      const t = tasksById.get(id);
+      return !!t && taskMatchesFilter(t, scope, hideCompleted, today);
+    }),
+    [taskIds, tasksById, scope, hideCompleted, today],
+  );
 
   const activeCount = taskIds.reduce((n, id) => {
     const t = tasksById.get(id);
@@ -91,7 +109,7 @@ export function TaskColumn({ list, taskIds, tasksById, tags, onOpenTask, dragAct
         <span style={{ fontSize: 13, fontWeight: 800, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", position: "relative" }}>
           {list.name}
         </span>
-        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", fontFamily: "var(--font-mono)", position: "relative" }}>{taskIds.length}</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", fontFamily: "var(--font-mono)", position: "relative" }}>{visibleIds.length}</span>
         <Button type="text" size="small" icon={<TbPlus size={14} />} onClick={() => setAddOpen((v) => !v)} aria-label={`Add task to ${list.name}`} style={{ position: "relative" }} />
       </div>
 
@@ -111,15 +129,15 @@ export function TaskColumn({ list, taskIds, tasksById, tags, onOpenTask, dragAct
 
       <div ref={setNodeRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 8, background: isOver ? "var(--border)" : "transparent" }}>
         <SortableContext items={taskIds.map(taskDndId)} strategy={verticalListSortingStrategy}>
-          {taskIds.length === 0 && (
+          {visibleIds.length === 0 && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, color: "var(--ink-soft)", padding: "28px 0" }}>
               <TbListCheck size={20} style={{ opacity: 0.5 }} />
-              <span style={{ fontSize: 12 }}>No tasks</span>
+              <span style={{ fontSize: 12 }}>{taskIds.length === 0 ? "No tasks" : "Nothing matches this filter"}</span>
             </div>
           )}
           {taskIds.map((id) => {
             const task = tasksById.get(id);
-            if (!task) return null;
+            if (!task || !visibleIds.includes(id)) return null;
             return <TaskCard key={id} task={task} tags={tags} onOpen={() => onOpenTask(id)} dragActive={dragActive} />;
           })}
         </SortableContext>
