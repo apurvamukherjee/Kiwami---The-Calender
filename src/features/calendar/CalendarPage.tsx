@@ -78,10 +78,22 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
   const taskLists = useTaskLists();
   const taskTags = useTaskTags();
   const eventCount = useLiveQuery(() => db.events.count(), []);
+  // A dated note/task (e.g. a task added from the Tasks tab with a due date)
+  // renders on the calendar via useNotesForRange/useTasksForRange even
+  // though it lives outside the `events` table — so this overlay must check
+  // for those too, or it keeps floating over a calendar that's no longer
+  // actually empty. Mirrors the same dueDate/doDate-presence + archived/
+  // wontDo filtering those hooks already use.
+  const scheduledNoteCount = useLiveQuery(() => db.notes.filter((n) => !!n.dueDate).count(), []);
+  const scheduledTaskCount = useLiveQuery(
+    () => db.tasks.filter((t) => !t.archived && !t.wontDo && !!(t.doDate ?? t.dueDate)).count(),
+    []
+  );
   // Today has its own, more accurate empty state (it can be non-empty from
   // tasks/reminders alone, with zero real calendar events) — this one stays
   // scoped to the other views, where "0 events" really does mean empty.
-  const showEmptyState = eventCount === 0 && view !== "today";
+  const showEmptyState =
+    eventCount === 0 && scheduledNoteCount === 0 && scheduledTaskCount === 0 && view !== "today";
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CalendarItem | null>(null);
