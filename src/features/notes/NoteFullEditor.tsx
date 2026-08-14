@@ -119,6 +119,17 @@ export function NoteFullEditor({ note, onClose }: Props) {
 
   useEffect(() => () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); }, []);
 
+  // Every other sheet in the app closes on Escape for free (antd Modal's
+  // own behavior via Sheet.tsx) — this component deliberately isn't a Modal
+  // (see the component doc comment), so it has to wire that up itself.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") void handleClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [editor, onClose]);
+
   if (!editor) return null;
 
   const colors = [

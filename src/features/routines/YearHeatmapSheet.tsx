@@ -37,7 +37,7 @@ export function YearHeatmapSheet({ open, onClose }: Props) {
   }
 
   return (
-    <Sheet open={open} onCancel={onClose} footer={null} title="Year in review" width={720} afterOpenChange={focusContent}>
+    <Sheet open={open} onCancel={onClose} footer={null} title="Year in review" width={820} afterOpenChange={focusContent}>
       <div ref={contentRef} tabIndex={-1} style={{ outline: "none" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, marginTop: 8, flexWrap: "wrap" }}>
           <Select

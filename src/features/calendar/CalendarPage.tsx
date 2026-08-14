@@ -133,9 +133,9 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
         ? `${start.format("MMM D")} – ${end.format("D, YYYY")}`
         : `${start.format("MMM D")} – ${end.format("MMM D, YYYY")}`;
     }
-    if (view === "day") return d.format("dddd, D MMMM YYYY");
+    if (view === "day") return d.format(isMobile ? "ddd, D MMM YYYY" : "dddd, D MMMM YYYY");
     return `${dayjs(rangeStart).format("MMM D")} – ${dayjs(rangeEnd).format("MMM D, YYYY")}`;
-  }, [view, currentDate, rangeStart, rangeEnd]);
+  }, [view, currentDate, rangeStart, rangeEnd, isMobile]);
 
   function step(dir: 1 | -1) {
     if (view === "today") return; // dashboard, not a navigable view — always shows the real today
@@ -186,7 +186,7 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
       <div style={{
-        display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
+        display: "flex", alignItems: "center", gap: isMobile ? 8 : 12, padding: isMobile ? "10px 12px" : "10px 16px",
         borderBottom: "1px solid var(--border)", flexWrap: "wrap", flexShrink: 0,
         background: "var(--toolbar-bg)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
         position: "relative", zIndex: 10,
@@ -210,12 +210,24 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
             />
           </div>
         )}
-        <div style={{ fontSize: 15, fontWeight: 800, flex: 1, minWidth: 140 }}>{periodLabel}</div>
-        <Segmented value={view} onChange={(v) => setView(v as CalendarView)} options={isMobile ? MOBILE_VIEWS : DESKTOP_VIEWS} />
-        <Button type="primary" icon={<TbPlus size={15} />} onClick={() => openCreate()}>New</Button>
-        <Button type="text" icon={<TbSearch size={16} />} onClick={onOpenPalette} aria-label="Search (Ctrl+K)" />
-        <Button type="text" icon={<TbActivity size={17} />} onClick={() => setYearHeatmapOpen(true)} aria-label="Year in review" />
-        <Button type="text" icon={<TbSettings size={17} />} onClick={() => setSettingsOpen(true)} aria-label="Settings" />
+        <div style={{
+          fontSize: 15, fontWeight: 800, flex: 1, minWidth: isMobile ? 80 : 140,
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+        }}>{periodLabel}</div>
+        {/* Forces the rest of the toolbar onto its own row on mobile instead
+            of leaving flexWrap to break wherever the pixel math happens to
+            land — that produced an unpredictable 3rd row with just two
+            stranded icon buttons on a 390px viewport. */}
+        {isMobile && <div style={{ flexBasis: "100%", width: 0 }} />}
+        <Segmented size={isMobile ? "small" : "middle"} value={view} onChange={(v) => setView(v as CalendarView)} options={isMobile ? MOBILE_VIEWS : DESKTOP_VIEWS} />
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 4 : 12 }}>
+          <Button type="primary" icon={<TbPlus size={15} />} onClick={() => openCreate()} aria-label="New event">
+            {isMobile ? null : "New"}
+          </Button>
+          <Button type="text" icon={<TbSearch size={16} />} onClick={onOpenPalette} aria-label="Search (Ctrl+K)" />
+          <Button type="text" icon={<TbActivity size={17} />} onClick={() => setYearHeatmapOpen(true)} aria-label="Year in review" />
+          <Button type="text" icon={<TbSettings size={17} />} onClick={() => setSettingsOpen(true)} aria-label="Settings" />
+        </div>
       </div>
 
       <div style={{ flex: 1, minHeight: 0, position: "relative" }}>

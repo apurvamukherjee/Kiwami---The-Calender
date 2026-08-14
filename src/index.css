@@ -51,6 +51,12 @@
   --toolbar-bg: rgba(19, 19, 19, 0.82);
 }
 
+/* Native <input type="date"> fields (EventEditorSheet, NoteComposer) theme
+   their text via the --ink/--bg vars above, but the browser-drawn calendar-
+   picker-indicator glyph ignores CSS color entirely — without this it stays
+   a dark icon on the now-dark field background and nearly disappears. */
+[data-theme="dark"] input[type="date"] { color-scheme: dark; }
+
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
