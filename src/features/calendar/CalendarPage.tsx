@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import dayjs from "dayjs";
 import { Button, Segmented, DatePicker } from "antd";
-import { useLiveQuery } from "dexie-react-hooks";
-import { TbChevronLeft, TbChevronRight, TbPlus, TbSettings, TbFlame, TbToolsKitchen2, TbCalendarPlus, TbActivity, TbSearch } from "react-icons/tb";
-import { db } from "../../db/db";
+import { TbChevronLeft, TbChevronRight, TbPlus, TbSettings, TbActivity, TbSearch } from "react-icons/tb";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { SettingsSheet } from "../../components/SettingsSheet";
 import { SectionTabs } from "../../components/SectionTabs";
@@ -77,23 +75,6 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
   const tasks = useTasksForRange(rangeStart, rangeEnd);
   const taskLists = useTaskLists();
   const taskTags = useTaskTags();
-  const eventCount = useLiveQuery(() => db.events.count(), []);
-  // A dated note/task (e.g. a task added from the Tasks tab with a due date)
-  // renders on the calendar via useNotesForRange/useTasksForRange even
-  // though it lives outside the `events` table — so this overlay must check
-  // for those too, or it keeps floating over a calendar that's no longer
-  // actually empty. Mirrors the same dueDate/doDate-presence + archived/
-  // wontDo filtering those hooks already use.
-  const scheduledNoteCount = useLiveQuery(() => db.notes.filter((n) => !!n.dueDate).count(), []);
-  const scheduledTaskCount = useLiveQuery(
-    () => db.tasks.filter((t) => !t.archived && !t.wontDo && !!(t.doDate ?? t.dueDate)).count(),
-    []
-  );
-  // Today has its own, more accurate empty state (it can be non-empty from
-  // tasks/reminders alone, with zero real calendar events) — this one stays
-  // scoped to the other views, where "0 events" really does mean empty.
-  const showEmptyState =
-    eventCount === 0 && scheduledNoteCount === 0 && scheduledTaskCount === 0 && view !== "today";
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CalendarItem | null>(null);
@@ -238,29 +219,6 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
       </div>
 
       <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-        {showEmptyState && (
-          <div style={{
-            position: "absolute", inset: 0, zIndex: 10, display: "flex",
-            alignItems: "center", justifyContent: "center", pointerEvents: "none",
-          }}>
-            <div style={{
-              pointerEvents: "auto", maxWidth: 380, textAlign: "center", padding: 28,
-              background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16,
-              boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
-            }}>
-              <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 8 }}>Nothing here yet</div>
-              <div style={{ fontSize: 13, color: "var(--ink-soft)", lineHeight: 1.6, marginBottom: 16 }}>
-                Create a plain event for anything one-off. Mark it a{" "}
-                <TbFlame size={13} style={{ verticalAlign: -2, color: "var(--accent)" }} /> <b>Routine</b> to
-                track a daily streak, or a <TbToolsKitchen2 size={13} style={{ verticalAlign: -2, color: "var(--teal)" }} />{" "}
-                <b>Food slot</b> (via Settings) to log meal-time adherence.
-              </div>
-              <Button type="primary" icon={<TbCalendarPlus size={15} />} onClick={() => openCreate()}>
-                New event
-              </Button>
-            </div>
-          </div>
-        )}
         {view === "today" && (
           <TodayView onTapItem={openEdit} onTapNote={openNote} onTapTask={openCalTask} />
         )}
