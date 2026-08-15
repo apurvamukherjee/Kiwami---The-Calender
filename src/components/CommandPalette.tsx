@@ -3,9 +3,12 @@ import type { InputRef } from "antd";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { Modal, Input, Empty } from "antd";
 import dayjs from "dayjs";
-import { TbSearch, TbCalendarEvent, TbFlame, TbToolsKitchen2, TbCalendarCheck, TbFlag, TbTarget, TbChartBar } from "react-icons/tb";
+import {
+  TbSearch, TbCalendarEvent, TbFlame, TbToolsKitchen2, TbCalendarCheck, TbFlag, TbTarget, TbChartBar, TbNote, TbBell,
+} from "react-icons/tb";
 import { useSearchEvents } from "../features/calendar/useSearchEvents";
 import { useSearchTasks } from "../features/tasks/useSearchTasks";
+import { useSearchNotes } from "../features/notes/useSearchNotes";
 import { useTokens } from "../hooks/useTokens";
 import { PRIORITY_TOKEN_KEY } from "../lib/tasks";
 
@@ -15,8 +18,21 @@ interface Props {
   onGoToDate: (date: string) => void;
   onGoToToday: () => void;
   onGoToTask: (taskId: number) => void;
+  onGoToNote: (noteId: number) => void;
   onGoToFocus: () => void;
   onGoToWeeklyReview: () => void;
+}
+
+// One flat row per result, built by concatenating every producer (static
+// actions, then events/tasks/notes) — this is the single source of truth
+// for both rendering and keyboard-nav/click dispatch, so adding a new
+// producer never means hand-copying index math into a second place.
+interface Row {
+  key: string;
+  icon: ReactNode;
+  primary: ReactNode;
+  secondary?: ReactNode;
+  run: () => void;
 }
 
 // One search surface behind two entry points (Ctrl/Cmd+K and the toolbar
@@ -24,11 +40,12 @@ interface Props {
 // useSearchEvents.ts. A floating top-anchored overlay (not the app's usual
 // bottom-sheet-on-mobile Sheet) since a command palette should feel like a
 // keyboard-first spotlight on every device.
-export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToTask, onGoToFocus, onGoToWeeklyReview }: Props) {
+export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToTask, onGoToNote, onGoToFocus, onGoToWeeklyReview }: Props) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
-  const results = useSearchEvents(query);
+  const eventResults = useSearchEvents(query);
   const taskResults = useSearchTasks(query);
+  const noteResults = useSearchNotes(query, open);
   const inputRef = useRef<InputRef>(null);
   const tokens = useTokens();
 
@@ -40,44 +57,70 @@ export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToT
   }, [open]);
   useEffect(() => setActiveIndex(0), [query]);
 
-  const staticActions = useMemo(() => {
+  const rows = useMemo<Row[]>(() => {
     const q = query.trim().toLowerCase();
-    const actions: { label: string; icon: ReactNode; run: () => void }[] = [];
-    if (!q || "today".includes(q)) actions.push({ label: "Go to today", icon: <TbCalendarCheck size={14} style={{ color: "var(--accent)" }} />, run: onGoToToday });
-    if (!q || "focus".includes(q)) actions.push({ label: "Focus", icon: <TbTarget size={14} style={{ color: "var(--accent)" }} />, run: onGoToFocus });
-    if (!q || "weekly review".includes(q) || "review".includes(q)) {
-      actions.push({ label: "Weekly review", icon: <TbChartBar size={14} style={{ color: "var(--accent)" }} />, run: onGoToWeeklyReview });
-    }
-    return actions;
-  }, [query, onGoToToday, onGoToFocus, onGoToWeeklyReview]);
+    const list: Row[] = [];
 
-  const total = staticActions.length + results.length + taskResults.length;
+    if (!q || "today".includes(q)) {
+      list.push({ key: "action-today", icon: <TbCalendarCheck size={14} style={{ color: "var(--accent)" }} />, primary: "Go to today", run: onGoToToday });
+    }
+    if (!q || "focus".includes(q)) {
+      list.push({ key: "action-focus", icon: <TbTarget size={14} style={{ color: "var(--accent)" }} />, primary: "Focus", run: onGoToFocus });
+    }
+    if (!q || "weekly review".includes(q) || "review".includes(q)) {
+      list.push({ key: "action-review", icon: <TbChartBar size={14} style={{ color: "var(--accent)" }} />, primary: "Weekly review", run: onGoToWeeklyReview });
+    }
+
+    for (const r of eventResults) {
+      list.push({
+        key: `event-${r.event.id}`,
+        icon: r.event.isRoutine ? <TbFlame size={14} style={{ color: "var(--accent)", flexShrink: 0 }} />
+          : r.event.isFoodSlot ? <TbToolsKitchen2 size={14} style={{ color: "var(--teal)", flexShrink: 0 }} />
+          : <TbCalendarEvent size={14} style={{ color: "var(--ink-soft)", flexShrink: 0 }} />,
+        primary: r.event.title,
+        secondary: dayjs(r.date).format("D MMM"),
+        run: () => onGoToDate(r.date),
+      });
+    }
+
+    for (const tr of taskResults) {
+      if (tr.task.id == null) continue;
+      const id = tr.task.id;
+      list.push({
+        key: `task-${id}`,
+        icon: <TbFlag size={14} style={{ color: tokens[PRIORITY_TOKEN_KEY[tr.task.priority]], flexShrink: 0 }} />,
+        primary: tr.task.title,
+        secondary: tr.task.dueDate ? dayjs(tr.task.dueDate).format("D MMM") : undefined,
+        run: () => onGoToTask(id),
+      });
+    }
+
+    for (const nr of noteResults) {
+      if (nr.note.id == null) continue;
+      const id = nr.note.id;
+      list.push({
+        key: `note-${id}`,
+        icon: nr.note.kind === "reminder" ? <TbBell size={14} style={{ color: "var(--teal)", flexShrink: 0 }} /> : <TbNote size={14} style={{ color: "var(--ink-soft)", flexShrink: 0 }} />,
+        primary: nr.note.title,
+        secondary: nr.note.dueDate ? dayjs(nr.note.dueDate).format("D MMM") : undefined,
+        run: () => onGoToNote(id),
+      });
+    }
+
+    return list;
+  }, [query, eventResults, taskResults, noteResults, tokens, onGoToToday, onGoToFocus, onGoToWeeklyReview, onGoToDate, onGoToTask, onGoToNote]);
 
   function runIndex(i: number) {
-    if (i < staticActions.length) {
-      staticActions[i].run();
-      onClose();
-      return;
-    }
-    if (i < staticActions.length + results.length) {
-      const r = results[i - staticActions.length];
-      if (r) {
-        onGoToDate(r.date);
-        onClose();
-      }
-      return;
-    }
-    const tr = taskResults[i - staticActions.length - results.length];
-    if (tr?.task.id != null) {
-      onGoToTask(tr.task.id);
-      onClose();
-    }
+    const row = rows[i];
+    if (!row) return;
+    row.run();
+    onClose();
   }
 
   function onKeyDown(e: ReactKeyboardEvent) {
-    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIndex((i) => Math.min(total - 1, i + 1)); }
+    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIndex((i) => Math.min(rows.length - 1, i + 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIndex((i) => Math.max(0, i - 1)); }
-    else if (e.key === "Enter") { e.preventDefault(); if (total > 0) runIndex(activeIndex); }
+    else if (e.key === "Enter") { e.preventDefault(); if (rows.length > 0) runIndex(activeIndex); }
   }
 
   return (
@@ -108,7 +151,7 @@ export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToT
         <Input
           ref={inputRef}
           size="large"
-          placeholder="Search events, tasks, or jump to today…"
+          placeholder="Search events, notes, tasks, or jump to today…"
           variant="borderless"
           prefix={<TbSearch size={16} style={{ color: "var(--ink-soft)" }} />}
           style={{ fontFamily: "var(--font-mono)" }}
@@ -116,67 +159,28 @@ export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToT
           onChange={(e) => setQuery(e.target.value)}
         />
         <div style={{ maxHeight: 360, overflowY: "auto", borderTop: "1px solid var(--border)" }}>
-          {total === 0 && query.trim() && (
+          {rows.length === 0 && query.trim() && (
             <div style={{ padding: "24px 0" }}>
               <Empty description="No matches" image={Empty.PRESENTED_IMAGE_SIMPLE} />
             </div>
           )}
-          {staticActions.map((a, i) => (
+          {rows.map((row, i) => (
             <div
-              key={a.label}
+              key={row.key}
               onClick={() => runIndex(i)}
               onMouseEnter={() => setActiveIndex(i)}
               style={{
                 display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", cursor: "pointer",
-                background: activeIndex === i ? "var(--border)" : "transparent", fontSize: 13, fontWeight: 700,
+                background: activeIndex === i ? "var(--border)" : "transparent",
               }}
             >
-              {a.icon}
-              {a.label}
+              {row.icon}
+              <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {row.primary}
+              </div>
+              {row.secondary && <div style={{ fontSize: 11, color: "var(--ink-soft)", flexShrink: 0 }}>{row.secondary}</div>}
             </div>
           ))}
-          {results.map((r, ri) => {
-            const i = staticActions.length + ri;
-            return (
-              <div
-                key={r.event.id}
-                onClick={() => runIndex(i)}
-                onMouseEnter={() => setActiveIndex(i)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", cursor: "pointer",
-                  background: activeIndex === i ? "var(--border)" : "transparent",
-                }}
-              >
-                {r.event.isRoutine ? <TbFlame size={14} style={{ color: "var(--accent)", flexShrink: 0 }} />
-                  : r.event.isFoodSlot ? <TbToolsKitchen2 size={14} style={{ color: "var(--teal)", flexShrink: 0 }} />
-                  : <TbCalendarEvent size={14} style={{ color: "var(--ink-soft)", flexShrink: 0 }} />}
-                <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {r.event.title}
-                </div>
-                <div style={{ fontSize: 11, color: "var(--ink-soft)", flexShrink: 0 }}>{dayjs(r.date).format("D MMM")}</div>
-              </div>
-            );
-          })}
-          {taskResults.map((tr, tri) => {
-            const i = staticActions.length + results.length + tri;
-            return (
-              <div
-                key={tr.task.id}
-                onClick={() => runIndex(i)}
-                onMouseEnter={() => setActiveIndex(i)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", cursor: "pointer",
-                  background: activeIndex === i ? "var(--border)" : "transparent",
-                }}
-              >
-                <TbFlag size={14} style={{ color: tokens[PRIORITY_TOKEN_KEY[tr.task.priority]], flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {tr.task.title}
-                </div>
-                {tr.task.dueDate && <div style={{ fontSize: 11, color: "var(--ink-soft)", flexShrink: 0 }}>{dayjs(tr.task.dueDate).format("D MMM")}</div>}
-              </div>
-            );
-          })}
         </div>
       </div>
     </Modal>

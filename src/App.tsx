@@ -59,6 +59,7 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [pendingCalendarNav, setPendingCalendarNav] = useState<CalendarNavRequest | null>(null);
   const [pendingTaskId, setPendingTaskId] = useState<number | undefined>(undefined);
+  const [pendingNoteId, setPendingNoteId] = useState<number | undefined>(undefined);
   const [pendingTasksAction, setPendingTasksAction] = useState<"focus" | "weekly-review" | null>(null);
 
   useEffect(() => {
@@ -83,6 +84,10 @@ export default function App() {
   function goToTask(taskId: number) {
     setSection("tasks");
     setPendingTaskId(taskId);
+  }
+  function goToNote(noteId: number) {
+    setSection("notes");
+    setPendingNoteId(noteId);
   }
   function goToFocus() {
     setSection("tasks");
@@ -142,7 +147,12 @@ export default function App() {
                   onConsumePendingNav={() => setPendingCalendarNav(null)}
                 />
               ) : section === "notes" ? (
-                <NotesPage section={section} onChangeSection={setSection} />
+                <NotesPage
+                  section={section}
+                  onChangeSection={setSection}
+                  pendingNoteId={pendingNoteId}
+                  onConsumePendingNoteId={() => setPendingNoteId(undefined)}
+                />
               ) : (
                 <TasksPage
                   section={section}
@@ -164,6 +174,7 @@ export default function App() {
           onGoToDate={goToDate}
           onGoToToday={goToToday}
           onGoToTask={goToTask}
+          onGoToNote={goToNote}
           onGoToFocus={goToFocus}
           onGoToWeeklyReview={goToWeeklyReview}
         />

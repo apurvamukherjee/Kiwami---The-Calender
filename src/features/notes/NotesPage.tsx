@@ -32,6 +32,10 @@ const KIND_FILTER_OPTIONS = [
 interface Props {
   section: Section;
   onChangeSection: (s: Section) => void;
+  // Command Palette note-search jump — same cross-section handoff shape as
+  // TasksPage's pendingTaskId (App.tsx's goToNote).
+  pendingNoteId?: number;
+  onConsumePendingNoteId: () => void;
 }
 
 // Notes/Tasks/Reminders shell, mirroring CalendarPage.tsx's structure
@@ -44,7 +48,7 @@ interface Props {
 // db.ts's v4 migration), rendered via TaskAgendaRow/TaskDetailSheet instead
 // of NoteListItem/NoteEditorSheet. Notes/Reminders still live in the
 // `notes` table exactly as before.
-export function NotesPage({ section, onChangeSection }: Props) {
+export function NotesPage({ section, onChangeSection, pendingNoteId, onConsumePendingNoteId }: Props) {
   const isMobile = useIsMobile();
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("timeline");
@@ -136,6 +140,21 @@ export function NotesPage({ section, onChangeSection }: Props) {
     setTaskDetailOpen(true);
   }
 
+  // Command Palette note-search jump. Mirrors TasksPage's pendingTaskId
+  // effect exactly: on a fresh mount (e.g. jumping here while Calendar was
+  // active), useNotes()'s live query hasn't resolved yet on the first
+  // render, so this only consumes the request once the note is actually
+  // found — letting the effect naturally re-check on the next render instead
+  // of silently clearing it against stale (empty) data.
+  useEffect(() => {
+    if (pendingNoteId == null) return;
+    const n = allNotes.find((note) => note.id === pendingNoteId);
+    if (!n) return;
+    openNote(n);
+    onConsumePendingNoteId();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingNoteId, allNotes, onConsumePendingNoteId]);
+
   const isEmpty = notes.length === 0 && tasks.length === 0;
 
   return (
@@ -217,7 +236,10 @@ export function NotesPage({ section, onChangeSection }: Props) {
       <NoteEditorSheet open={editorOpen} onClose={() => setEditorOpen(false)} note={editing} />
       {fullEditorOpen && (
         <Suspense fallback={null}>
-          <NoteFullEditor note={editing} onClose={() => setFullEditorOpen(false)} />
+          {/* key forces a remount (fresh editor instance) when the Command
+              Palette jumps from one open note straight to another, since
+              Tiptap's useEditor/noteIdRef only read `note` on mount. */}
+          <NoteFullEditor key={editing?.id ?? "new"} note={editing} onClose={() => setFullEditorOpen(false)} />
         </Suspense>
       )}
       <TaskDetailSheet open={taskDetailOpen} onClose={() => setTaskDetailOpen(false)} task={editingTask} lists={taskLists} tags={taskTags} />

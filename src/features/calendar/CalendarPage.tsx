@@ -276,7 +276,9 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
       <NoteEditorSheet open={noteEditorOpen} onClose={() => setNoteEditorOpen(false)} note={editingNote} />
       {noteFullEditorOpen && (
         <Suspense fallback={null}>
-          <NoteFullEditor note={editingNote} onClose={() => setNoteFullEditorOpen(false)} />
+          {/* key: see NotesPage.tsx's identical comment — forces a remount
+              instead of reusing a stale Tiptap instance for a new note. */}
+          <NoteFullEditor key={editingNote?.id ?? "new"} note={editingNote} onClose={() => setNoteFullEditorOpen(false)} />
         </Suspense>
       )}
       <TaskDetailSheet open={taskDetailOpen} onClose={() => setTaskDetailOpen(false)} task={editingCalTask} lists={taskLists} tags={taskTags} />
