@@ -16,7 +16,7 @@ account, no server, your data never leaves your device.
 ![Framer Motion](https://img.shields.io/badge/Framer%20Motion-animation-0055FF?logo=framer&logoColor=white)
 ![Tabler Icons](https://img.shields.io/badge/Tabler-Icons-000000)
 ![PWA](https://img.shields.io/badge/Offline-first-000000)
-![Vitest](https://img.shields.io/badge/Vitest-18%20passing-6E9F18?logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-61%20passing-6E9F18?logo=vitest&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-informational)
 
 </div>
@@ -61,6 +61,12 @@ account, no server, your data never leaves your device.
   title, jump straight to its date, or jump to Today, all keyboard-driven.
 - 💎 **Forged streak milestones** — hit a 7/30/100/365-day streak and that
   day's bead forges into a faceted diamond with a one-time burst animation.
+- 🩺 **Life tab** — medications (scheduled + as-needed, with the same Ember
+  Chain adherence streak and a refill-countdown alert), chores (recurring,
+  with an optional "reschedule from when you actually finish it" mode),
+  household inventory with a running-low flag, and a wishlist → buy-list
+  lifecycle with store grouping and offline share/clipboard export — all
+  unified into a single cross-domain **Today Digest**.
 
 ## 📸 Screenshots
 
@@ -120,6 +126,25 @@ surface either way.
 
 </td>
 </tr>
+<tr>
+<td>
+
+**Life tab — Today Digest** — a cross-domain daily view: due medications,
+chores due/overdue, running-low inventory, and urgent buy-list items, all
+in one scroll.
+
+<img src="docs/screenshots/life-today-dark.png" alt="Life tab Today Digest" width="100%">
+
+</td>
+<td>
+
+**Life tab — Medications** — scheduled doses with their own compact Ember
+Chain streak, a refill-countdown alert, and one-tap PRN logging.
+
+<img src="docs/screenshots/life-medications-dark.png" alt="Life tab Medications view" width="100%">
+
+</td>
+</tr>
 </table>
 
 ## 📦 What's inside
@@ -134,6 +159,11 @@ surface either way.
 | 🍽️ | **Food-time slots** | Named, retimeable recurring slots with a one-tap Ate/Skipped log — adherence only, no macro tracking |
 | 🗓️ | **Year in review** | Per-routine GitHub-style heatmap, pick any routine and year |
 | ⌨️ | **Command Palette** | Ctrl/Cmd+K or the toolbar search icon — search by title, jump to a date, jump to Today |
+| 🩺 | **Life — Medications** | Scheduled (multi-dose/day, any recurrence) + as-needed, Ember Chain adherence streak, refill-countdown alert |
+| 🧹 | **Life — Chores** | Recurring or one-off, fixed-schedule or reschedule-from-completion, no streak (completion-based, not habit-based) |
+| 📦 | **Life — Inventory** | Quantity tracking with a running-low flag, one tap to add a low item straight to the buy list |
+| 🛒 | **Life — Shopping** | Wishlist → promote → buy list → mark bought, grouped by store, offline share/clipboard export |
+| ☀️ | **Life — Today Digest** | Every domain above, unified: due/overdue catch-up, now/next, schedule, tasks, chores, shopping — in one scroll |
 | ⚙️ | **Settings** | Theme toggle (dark/light, respects system default), food-slot management |
 | 🔑 | **Keyboard** | ←/→ step the period, `T` jumps to Today, Ctrl/Cmd+K opens search |
 
@@ -154,7 +184,7 @@ npm run dev          # prints Local + Network URL — open the Network URL on yo
 ```bash
 npm run build         # -> /dist, generates the PWA service worker
 npm run preview        # serve /dist to verify the installed/offline experience
-npm run test            # vitest — recurrence + streak suites (18 tests)
+npm run test            # vitest — recurrence, streak, medication/inventory logic, etc. (61 tests)
 ```
 
 ## 🧱 Architecture

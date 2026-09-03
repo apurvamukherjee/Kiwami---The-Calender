@@ -5,12 +5,23 @@ import { Modal, Input, Empty } from "antd";
 import dayjs from "dayjs";
 import {
   TbSearch, TbCalendarEvent, TbFlame, TbToolsKitchen2, TbCalendarCheck, TbFlag, TbTarget, TbChartBar, TbNote, TbBell,
+  TbPill, TbChecklist, TbBox, TbHeart, TbShoppingCart, TbLayoutDashboard,
 } from "react-icons/tb";
 import { useSearchEvents } from "../features/calendar/useSearchEvents";
 import { useSearchTasks } from "../features/tasks/useSearchTasks";
 import { useSearchNotes } from "../features/notes/useSearchNotes";
+import { useLifeSearch } from "../features/life/useLifeSearch";
+import type { LifeView } from "../features/life/LifePage";
 import { useTokens } from "../hooks/useTokens";
 import { PRIORITY_TOKEN_KEY } from "../lib/tasks";
+
+const LIFE_KIND_ICON: Record<string, ReactNode> = {
+  medication: <TbPill size={14} style={{ color: "var(--accent)", flexShrink: 0 }} />,
+  chore: <TbChecklist size={14} style={{ color: "var(--teal)", flexShrink: 0 }} />,
+  inventory: <TbBox size={14} style={{ color: "var(--teal)", flexShrink: 0 }} />,
+  wishlist: <TbHeart size={14} style={{ color: "var(--ink-soft)", flexShrink: 0 }} />,
+  buyList: <TbShoppingCart size={14} style={{ color: "var(--gold)", flexShrink: 0 }} />,
+};
 
 interface Props {
   open: boolean;
@@ -21,6 +32,7 @@ interface Props {
   onGoToNote: (noteId: number) => void;
   onGoToFocus: () => void;
   onGoToWeeklyReview: () => void;
+  onGoToLife: (view: LifeView) => void;
 }
 
 // One flat row per result, built by concatenating every producer (static
@@ -40,12 +52,13 @@ interface Row {
 // useSearchEvents.ts. A floating top-anchored overlay (not the app's usual
 // bottom-sheet-on-mobile Sheet) since a command palette should feel like a
 // keyboard-first spotlight on every device.
-export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToTask, onGoToNote, onGoToFocus, onGoToWeeklyReview }: Props) {
+export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToTask, onGoToNote, onGoToFocus, onGoToWeeklyReview, onGoToLife }: Props) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const eventResults = useSearchEvents(query);
   const taskResults = useSearchTasks(query);
   const noteResults = useSearchNotes(query, open);
+  const lifeResults = useLifeSearch(query);
   const inputRef = useRef<InputRef>(null);
   const tokens = useTokens();
 
@@ -69,6 +82,15 @@ export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToT
     }
     if (!q || "weekly review".includes(q) || "review".includes(q)) {
       list.push({ key: "action-review", icon: <TbChartBar size={14} style={{ color: "var(--accent)" }} />, primary: "Weekly review", run: onGoToWeeklyReview });
+    }
+    if (!q || "life".includes(q) || "today".includes(q)) {
+      list.push({ key: "action-life", icon: <TbLayoutDashboard size={14} style={{ color: "var(--accent)" }} />, primary: "Jump to Life", run: () => onGoToLife("today") });
+    }
+    if (!q || "log medication dose".includes(q) || "medication".includes(q)) {
+      list.push({ key: "action-med", icon: <TbPill size={14} style={{ color: "var(--accent)" }} />, primary: "Log medication dose", run: () => onGoToLife("medications") });
+    }
+    if (!q || "add to buy list".includes(q) || "buy list".includes(q) || "shopping".includes(q)) {
+      list.push({ key: "action-buy", icon: <TbShoppingCart size={14} style={{ color: "var(--gold)" }} />, primary: "Add to buy list", run: () => onGoToLife("shopping") });
     }
 
     for (const r of eventResults) {
@@ -107,8 +129,17 @@ export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToT
       });
     }
 
+    for (const lr of lifeResults) {
+      list.push({
+        key: lr.key,
+        icon: LIFE_KIND_ICON[lr.kind],
+        primary: lr.title,
+        run: () => onGoToLife(lr.view),
+      });
+    }
+
     return list;
-  }, [query, eventResults, taskResults, noteResults, tokens, onGoToToday, onGoToFocus, onGoToWeeklyReview, onGoToDate, onGoToTask, onGoToNote]);
+  }, [query, eventResults, taskResults, noteResults, lifeResults, tokens, onGoToToday, onGoToFocus, onGoToWeeklyReview, onGoToDate, onGoToTask, onGoToNote, onGoToLife]);
 
   function runIndex(i: number) {
     const row = rows[i];

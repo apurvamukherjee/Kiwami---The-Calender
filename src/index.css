@@ -24,6 +24,10 @@
   --font-display: "Playfair Display", serif;
   --font-mono: "JetBrains Mono", monospace;
   --toolbar-bg: rgba(255, 255, 255, 0.82);
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.10);
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 /* Dark is the default (data-theme is set on <html> before hydration —
@@ -49,6 +53,10 @@
   --surface-high: #2a2a2a;
   --surface-highest: #353535;
   --toolbar-bg: rgba(19, 19, 19, 0.82);
+  --glass-bg: rgba(20, 20, 20, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 
 /* Native <input type="date"> fields (EventEditorSheet, NoteComposer) theme
@@ -179,6 +187,35 @@ input, textarea, [contenteditable="true"], .selectable {
   100% { transform: translateY(-110vh) translateX(16px) scale(1); opacity: 0; }
 }
 .ember-spark { animation: ember-rise linear infinite; will-change: transform; }
+
+/* -----------------------------------------------------------------------
+   GLASS — hero-surface treatment for the Life tab's Today Digest catch-up
+   strip (see LIFE_TAB_FEATURE_PLAN.md §9 / Appendix A). Mechanics only are
+   taken from the researched glassmorphism spec — Kiwami's OWN ember/teal/
+   gold tokens are used for color, not Appendix A's generic placeholder hex
+   values (#F97316 etc. were illustrative, not this app's real palette).
+   Blur radius is a LITERAL 14px, never fed through a var() — iOS Safari 18
+   silently drops backdrop-filter when the radius comes from a CSS custom
+   property. Wrapped in @supports so unsupported engines (older Firefox)
+   just keep the solid --glass-bg fill with no blur — never gated behind
+   blur actually rendering. Reserved for genuine hero moments only, per the
+   existing intensity-tier convention (RoutineDetailSheet/CommandPalette
+   already use the "Floating Blade" treatment below) — dense list surfaces
+   (ChoresView/InventoryView/etc.) deliberately stay flat.
+   ----------------------------------------------------------------------- */
+.glass {
+  position: relative;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  box-shadow: var(--glass-shadow), var(--glass-rim);
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .glass {
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+    backdrop-filter: blur(14px) saturate(180%);
+  }
+}
 
 /* The Command Palette's "Floating Blade" — a border that's invisible until
    the search input inside is focused, then lights up diamond-cyan. */

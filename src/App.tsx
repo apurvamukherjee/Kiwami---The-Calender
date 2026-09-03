@@ -10,7 +10,9 @@ import { InstallPrompt } from "./components/InstallPrompt";
 import { CommandPalette } from "./components/CommandPalette";
 import { BottomNav, type Section } from "./components/BottomNav";
 import type { CalendarNavRequest } from "./features/calendar/CalendarPage";
+import type { LifeView } from "./features/life/LifePage";
 import { resolveOverdueOccurrences } from "./lib/occurrences";
+import { resolveOverdueMedicationDoses } from "./lib/medications";
 import { checkDueReminders } from "./lib/notifications";
 import { todayKey } from "./lib/date.utils";
 
@@ -22,6 +24,7 @@ import { todayKey } from "./lib/date.utils";
 const CalendarPage = lazy(() => import("./features/calendar/CalendarPage").then((m) => ({ default: m.CalendarPage })));
 const NotesPage = lazy(() => import("./features/notes/NotesPage").then((m) => ({ default: m.NotesPage })));
 const TasksPage = lazy(() => import("./features/tasks/TasksPage").then((m) => ({ default: m.TasksPage })));
+const LifePage = lazy(() => import("./features/life/LifePage").then((m) => ({ default: m.LifePage })));
 
 const SPLASH_SEEN_KEY = "kiwami-splash-seen";
 const REMINDER_SWEEP_INTERVAL_MS = 60_000;
@@ -61,6 +64,7 @@ export default function App() {
   const [pendingTaskId, setPendingTaskId] = useState<number | undefined>(undefined);
   const [pendingNoteId, setPendingNoteId] = useState<number | undefined>(undefined);
   const [pendingTasksAction, setPendingTasksAction] = useState<"focus" | "weekly-review" | null>(null);
+  const [pendingLifeView, setPendingLifeView] = useState<LifeView | undefined>(undefined);
 
   useEffect(() => {
     function onPaletteKey(e: KeyboardEvent) {
@@ -97,6 +101,10 @@ export default function App() {
     setSection("tasks");
     setPendingTasksAction("weekly-review");
   }
+  function goToLife(view: LifeView) {
+    setSection("life");
+    setPendingLifeView(view);
+  }
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", mode);
@@ -113,6 +121,7 @@ export default function App() {
   // must run before the calendar/streak UI reads occurrenceStatus.
   useEffect(() => {
     void resolveOverdueOccurrences();
+    void resolveOverdueMedicationDoses();
   }, []);
 
   // registerType:"autoUpdate" would otherwise swap the service worker
@@ -153,7 +162,7 @@ export default function App() {
                   pendingNoteId={pendingNoteId}
                   onConsumePendingNoteId={() => setPendingNoteId(undefined)}
                 />
-              ) : (
+              ) : section === "tasks" ? (
                 <TasksPage
                   section={section}
                   onChangeSection={setSection}
@@ -161,6 +170,15 @@ export default function App() {
                   onConsumePendingTaskId={() => setPendingTaskId(undefined)}
                   pendingTasksAction={pendingTasksAction}
                   onConsumePendingTasksAction={() => setPendingTasksAction(null)}
+                />
+              ) : (
+                <LifePage
+                  section={section}
+                  onChangeSection={setSection}
+                  onGoToDate={goToDate}
+                  onGoToTask={goToTask}
+                  pendingView={pendingLifeView}
+                  onConsumePendingView={() => setPendingLifeView(undefined)}
                 />
               )}
             </Suspense>
@@ -177,6 +195,7 @@ export default function App() {
           onGoToNote={goToNote}
           onGoToFocus={goToFocus}
           onGoToWeeklyReview={goToWeeklyReview}
+          onGoToLife={goToLife}
         />
         {needRefresh && (
           <div style={{

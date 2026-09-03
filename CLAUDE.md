@@ -637,3 +637,116 @@ Notes composer; confirmed the Tasks board's default Today+hide-completed
 view, the "N done today" badge, and the completed task reappearing
 (struck through) the instant "Show completed" is toggled on — zero console
 errors throughout.
+
+## Phase 7 — Life tab: medications, chores, inventory, shopping (2026-09-03)
+
+A fourth top-level section (`Calendar | Notes | Tasks | Life`, Calendar
+stays the default/home tab) built from a deep-research report on the
+"everything for today" niche. Full plan, decision log, and a phase-by-phase
+build record live in `LIFE_TAB_FEATURE_PLAN.md` — this entry is the
+condensed version. `BottomNav`/`SectionTabs`' `Section` type gained
+`"life"` (icon `TbLayoutDashboard`).
+
+**Data model** — Dexie `version(5)`, purely additive (`db/types.ts`/`db.ts`):
+`MedicationDto`/`MedicationLogDto`, `ChoreDto`, `InventoryItemDto`,
+`WishlistItemDto`/`BuyListItemDto`. None of this forks a new engine —
+medications/chores embed a `TaskRecurrenceDto` (same convention as
+`TaskDto.recurrence`, not a `recurrenceRules` table row), and medication
+adherence reuses `OccurrenceStatusValue` verbatim (UI relabels
+`done`→"Taken", `missed`→"Skipped" — the same trick `isFoodSlot` events
+already use), so `computeStreakFromStatuses` (`lib/streak.ts`) needed zero
+changes for medications' own Ember Chain. Chores' "reschedule from
+completion date" option reuses `rollTaskDueDateForward()` unmodified — the
+entire new behavior is which date `completeChore()` (`lib/chores.ts`)
+passes as the anchor: `todayKey()` when rescheduling from completion,
+the chore's own `dueDate` otherwise.
+
+**UI** — `src/features/life/`: `LifePage.tsx` (shell, mirrors `TasksPage.tsx`,
+a `Segmented` switches Today/Medications/Chores/Inventory/Shopping),
+`TodayDigest.tsx` (the unified daily view — catch-up strip, Now/Next,
+Medications, Schedule, Tasks, Chores & Household, Shopping — reusing
+`MedicationCard`/`ChoreCard`/`InventoryItemRow`/`BuyListRow` **verbatim**
+rather than a second row-UI, and the *same* `useCalendarEvents`/`useTasks`
+hooks Calendar's own `TodayView.tsx` already calls for Schedule/Tasks).
+Calendar's `TodayView.tsx` was deliberately left untouched — `TodayDigest`
+is a superset of it, and the overlap on events/tasks is an accepted
+trade-off, the same reasoning Phase 6 already used for Week/Day's
+independent note/task layout columns. Command Palette gained
+`useLifeSearch` (same `scoreMatch` fuzzy matcher as every other search
+producer) plus three quick-actions, and a `pendingLifeView` deep-link
+(mirroring `pendingTaskId`) so a palette result lands on the right
+sub-view, not just the tab.
+
+**Reminders**: `lib/notifications.ts`'s `checkDueReminders()` gained a
+third sweep (alongside notes/tasks) for scheduled medications — same
+best-effort, foreground-only honesty this app already had. De-duplication
+is a **session-only in-memory `Set`**, not a DB field, since a due-but-
+unlogged dose has no row to stamp a `notifiedAt` onto.
+
+**Three real bugs found by actually driving the browser** (not caught by
+typecheck/tests), in the same spirit as this file's other documented bugs:
+
+1. **Weekly recurrence with zero weekdays selected.** `ChoreEditorSheet`'s
+   recurrence picker was copied from `EventEditorSheet`'s proven pattern,
+   which has the same gap — a "Weekly" repeat with no weekday chosen
+   produces a rule `expandOccurrences()` can never satisfy. For an event
+   that's silently harmless (it just never renders); for a chore it's
+   worse: `completeChore()` correctly falls back to "no next occurrence →
+   complete normally" (by design, for a genuinely *ended* series), but an
+   empty-weekdays rule triggers that fallback on the very first completion,
+   silently turning a recurring chore into a one-off. **Fixed** in both
+   `ChoreEditorSheet.tsx`/`MedicationEditorSheet.tsx`: selecting "Weekly"
+   auto-defaults to today's weekday if none is picked yet.
+2. **A real Dexie `BulkError` crash.** React StrictMode's dev-only double
+   mount-effect let two concurrent `resolveOverdueMedicationDoses()` calls
+   both read "no row yet" for the same overdue dose and both `bulkAdd` it,
+   tripping `medicationLogs`' `&[medicationId+occurrenceDate+scheduledTime]`
+   unique index — the exact bug class this file already documents for
+   `ensureDefaultTaskLists()`. **Fixed** the identical way: wrapped the
+   read-then-write in one `db.transaction`.
+3. **Same-day doses were auto-missed before the user got a chance to act.**
+   `resolveOverdueMedicationDoses()`'s date range originally ran through
+   *today* inclusive, so a dose whose clock time had already passed today
+   got marked `"missed"` on the very next mount — racing ahead of the
+   reminder notification and denying the rest of the day as a grace period.
+   This app's own proven precedent, `resolveOverdueOccurrences()`
+   (routines), explicitly scopes to `.where("occurrenceDate").below(today)`
+   — strictly before today. **Fixed** to match it exactly: the range is now
+   `[lookback, yesterday]`.
+
+A fourth bug surfaced during the offline verification pass, unrelated to
+this feature's own code but caught while testing it: `vite.config.ts`'s
+`VitePWA` `workbox.globPatterns` never included `woff`/`woff2` at all, so
+the self-hosted `@fontsource` fonts this app claims are fully
+offline-available were never actually precached — any font weight/format
+the browser's regular HTTP cache hadn't independently retained 404'd the
+instant the network was disabled. The Life tab's bold `font-mono` time
+chips happened to be what finally triggered it. **Fixed**: added
+`woff,woff2` to the glob (precache grew from 32 to 42 entries).
+
+**Glass polish**: `index.css` gained `--glass-*` tokens (light `:root` +
+`[data-theme="dark"]` override, matching every other token) and a `.glass`
+utility — **literal** `blur(14px) saturate(180%)` (never through a
+`var()` — iOS Safari 18 silently drops a CSS-variable blur radius), both
+`-webkit-backdrop-filter` and `backdrop-filter`, wrapped in `@supports`
+with the solid `--glass-bg` fill as the fallback. Applied only to
+`TodayDigest`'s catch-up strip — its one genuine hero moment, per the
+existing hero-vs-dense intensity-tier convention (Phase 3) — every dense
+Life list stays flat. A respectful Framer Motion mount reveal
+(`{type:"spring", stiffness:300, damping:30, mass:0.2}`, gated through
+`useReducedMotion()`) was added to `TodayDigest`.
+
+**Verified**: `npm run typecheck`/`test` (61 tests, up from 48)/`build` all
+clean. A real headless-Chromium pass exercised every domain end to end —
+medication log → streak update, refill alert, chore complete → reschedule
+(both fixed-schedule and reschedule-from-completion modes, confirmed via
+the actual due-date rolling forward correctly), running-low inventory →
+add-to-buy-list, wishlist → promote → buy-list → mark bought, Command
+Palette search → jump to the correct sub-view, Today Digest section by
+section, both themes (light via Playwright's default, and genuine dark via
+`colorScheme: "dark"` emulation, confirming the no-stored-preference
+default resolves correctly), mobile 390px, and — against the actual
+production build (`vite preview`, a real registered service worker, not
+the dev server) — a genuine offline reload with the network fully
+disabled, twice in a row to also confirm the StrictMode-race fix holds
+under repeated real mounts. Zero console errors on every pass, in the end.

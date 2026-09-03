@@ -1,6 +1,9 @@
 import Dexie, { type Table } from "dexie";
 import { TOKENS } from "../theme";
-import type { EventDto, RecurrenceRuleDto, OccurrenceStatusDto, SettingDto, NoteDto, TaskDto, TaskListDto, TaskTagDto } from "./types";
+import type {
+  EventDto, RecurrenceRuleDto, OccurrenceStatusDto, SettingDto, NoteDto, TaskDto, TaskListDto, TaskTagDto,
+  MedicationDto, MedicationLogDto, ChoreDto, InventoryItemDto, WishlistItemDto, BuyListItemDto,
+} from "./types";
 
 class KiwamiDB extends Dexie {
   events!: Table<EventDto, number>;
@@ -11,6 +14,12 @@ class KiwamiDB extends Dexie {
   taskLists!: Table<TaskListDto, number>;
   tasks!: Table<TaskDto, number>;
   taskTags!: Table<TaskTagDto, number>;
+  medications!: Table<MedicationDto, number>;
+  medicationLogs!: Table<MedicationLogDto, number>;
+  chores!: Table<ChoreDto, number>;
+  inventoryItems!: Table<InventoryItemDto, number>;
+  wishlistItems!: Table<WishlistItemDto, number>;
+  buyListItems!: Table<BuyListItemDto, number>;
 
   constructor() {
     super("kiwami");
@@ -107,6 +116,25 @@ class KiwamiDB extends Dexie {
         } as TaskDto);
         await notesTable.delete(note.id!);
       }
+    });
+    // v5: adds medications/medicationLogs/chores/inventoryItems/wishlistItems/
+    // buyListItems (the Life tab). Purely additive — no upgrade() needed, same
+    // convention as v1->v2 and v2->v3. See LIFE_TAB_FEATURE_PLAN.md.
+    this.version(5).stores({
+      events: "++id, ownerId, startTime",
+      recurrenceRules: "++id, &eventId",
+      occurrenceStatus: "++id, eventId, occurrenceDate, &[eventId+occurrenceDate]",
+      settings: "&key",
+      notes: "++id, ownerId, kind, dueDate",
+      taskLists: "++id, ownerId, order",
+      tasks: "++id, ownerId, listId, completed, archived, dueDate, *tagIds",
+      taskTags: "++id, ownerId, name",
+      medications: "++id, ownerId, scheduleType, active",
+      medicationLogs: "++id, medicationId, occurrenceDate, &[medicationId+occurrenceDate+scheduledTime]",
+      chores: "++id, ownerId, archived, dueDate",
+      inventoryItems: "++id, ownerId, category",
+      wishlistItems: "++id, ownerId, archived, promoted",
+      buyListItems: "++id, ownerId, bought, urgency",
     });
   }
 }

@@ -145,6 +145,108 @@ export interface TaskDto {
   updatedAt: number;
 }
 
+// --- Life tab: medications, chores, inventory, wishlist/buy-list ---
+// See LIFE_TAB_FEATURE_PLAN.md for the full design. All four domains reuse
+// existing machinery rather than forking new engines: medications/chores
+// embed a TaskRecurrenceDto (same convention as TaskDto.recurrence, not a
+// recurrenceRules table row); medication adherence reuses
+// OccurrenceStatusValue verbatim (UI relabels done->"Taken",
+// missed->"Skipped", same trick isFoodSlot events already use) so
+// computeStreakFromStatuses needs zero changes.
+
+export type MedicationScheduleType = "scheduled" | "prn";
+
+export interface MedicationDto {
+  id?: number;
+  ownerId: string;
+  name: string;
+  dosage?: string; // free text, e.g. "500mg"
+  form?: string; // free text, e.g. "tablet", "capsule", "drops"
+  scheduleType: MedicationScheduleType;
+  recurrence?: TaskRecurrenceDto | null; // scheduled only
+  times: string[]; // HH:mm[], scheduled only — supports multiple doses/day
+  doseCountRemaining?: number;
+  refillThresholdDays?: number; // alert once projected days-remaining <= this
+  notes?: string;
+  streakCount?: number; // cached, scheduled only — mirrors EventDto.streakCount
+  active: boolean; // soft pause — inactive meds drop out of Today Digest/reminders, history kept
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface MedicationLogDto {
+  id?: number;
+  medicationId: number;
+  occurrenceDate: string; // YYYY-MM-DD
+  scheduledTime?: string; // HH:mm — which of `times` this resolves (scheduled only; absent for PRN)
+  status: OccurrenceStatusValue; // reused verbatim — UI relabels done->"Taken", missed->"Skipped"
+  resolvedAt?: number; // epoch ms
+}
+
+export interface ChoreDto {
+  id?: number;
+  ownerId: string;
+  title: string;
+  notes?: string;
+  recurrence?: TaskRecurrenceDto | null; // null/undefined = one-off chore
+  rescheduleFromCompletion: boolean; // true = next occurrence anchored on actual completion date
+  dueDate?: string;
+  lastCompletedAt?: number;
+  completed: boolean; // one-off chores only — recurring ones stay false and roll dueDate forward
+  archived: boolean;
+  archivedAt?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface InventoryItemDto {
+  id?: number;
+  ownerId: string;
+  name: string;
+  category?: string;
+  quantity: number;
+  unit?: string; // free text: "rolls", "bottles", "g"
+  minQuantity?: number; // running-low := minQuantity != null && quantity <= minQuantity (derived, never stored)
+  notes?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type WishlistPriority = "low" | "medium" | "high";
+export type ShoppingUrgency = "now" | "soon";
+
+export interface WishlistItemDto {
+  id?: number;
+  ownerId: string;
+  title: string;
+  priority: WishlistPriority;
+  category?: string;
+  notes?: string;
+  productUrl?: string;
+  manualPrice?: number;
+  promoted: boolean; // true once promoteToBuyList() ran — row stays (dimmed), never deleted by promotion
+  promotedAt?: number;
+  archived: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface BuyListItemDto {
+  id?: number;
+  ownerId: string;
+  title: string;
+  store?: string;
+  urgency: ShoppingUrgency;
+  manualPrice?: number;
+  productUrl?: string;
+  bought: boolean;
+  boughtAt?: number;
+  sourceWishlistId?: number; // set when created via promoteToBuyList()
+  sourceInventoryId?: number; // set when created via the running-low -> buy-list loop
+  createdAt: number;
+  updatedAt: number;
+}
+
 export type NoteKind = "note" | "task" | "reminder";
 
 export interface NoteDto {

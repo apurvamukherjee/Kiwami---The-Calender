@@ -32,8 +32,15 @@ export default defineConfig({
       },
       workbox: {
         // Dexie is the source of truth and needs no caching; this just makes
-        // the app shell + static assets available with zero network.
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest}"],
+        // the app shell + static assets available with zero network. woff/
+        // woff2 were missing here — a real bug found during the Life tab's
+        // offline verification pass: the self-hosted @fontsource fonts
+        // (index.css) were never actually precached, so a font weight/format
+        // the browser's own HTTP cache hadn't happened to retain yet would
+        // 404 on a genuine offline reload, contradicting CLAUDE.md's "static
+        // woff2 only... offline-first guarantee still holds" claim for
+        // those fonts.
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest,woff,woff2}"],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.hostname.endsWith("convex.cloud"),

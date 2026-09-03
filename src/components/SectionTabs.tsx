@@ -1,5 +1,5 @@
 import { Segmented } from "antd";
-import { TbCalendarEvent, TbNotes, TbListCheck } from "react-icons/tb";
+import { TbCalendarEvent, TbNotes, TbListCheck, TbLayoutDashboard } from "react-icons/tb";
 import type { Section } from "./BottomNav";
 
 interface Props {
@@ -21,6 +21,7 @@ export function SectionTabs({ section, onChange }: Props) {
         { label: <span style={{ display: "flex", alignItems: "center", gap: 4 }}><TbCalendarEvent size={13} /> Calendar</span>, value: "calendar" },
         { label: <span style={{ display: "flex", alignItems: "center", gap: 4 }}><TbNotes size={13} /> Notes</span>, value: "notes" },
         { label: <span style={{ display: "flex", alignItems: "center", gap: 4 }}><TbListCheck size={13} /> Tasks</span>, value: "tasks" },
+        { label: <span style={{ display: "flex", alignItems: "center", gap: 4 }}><TbLayoutDashboard size={13} /> Life</span>, value: "life" },
       ]}
     />
   );
