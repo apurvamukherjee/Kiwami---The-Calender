@@ -4,9 +4,13 @@
 
 ### *Own your days.*
 
-A local-first calendar PWA that fuses a full Month/Week/Day/Agenda view with
-a **routine/streak engine** and **food-time adherence tracking** — no
-account, no server, your data never leaves your device.
+A local-first, four-tab life PWA — **Calendar · Notes · Tasks · Life** — that
+fuses a full Month/Week/Day/Agenda calendar with a **routine/streak engine**,
+rich-text notes, a full Kanban task board, and medication/chore/inventory/
+shopping tracking. No account, no server, your data never leaves your device.
+
+**🔗 Live: [kiwami-kappa.vercel.app](https://kiwami-kappa.vercel.app/)** —
+installable as a PWA straight from the browser.
 
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
@@ -67,6 +71,16 @@ account, no server, your data never leaves your device.
   household inventory with a running-low flag, and a wishlist → buy-list
   lifecycle with store grouping and offline share/clipboard export — all
   unified into a single cross-domain **Today Digest**.
+- ✅ **A real Kanban task board** — drag-and-drop columns (`@dnd-kit`) with
+  velocity-based card tilt while dragging, collapsible columns, bulk
+  select → move/archive, priority color-coding, tags, subtasks with
+  one-tap "Help me start" breakdown templates, and a glass "Focus" mode
+  that surfaces one task full-screen with Done/Skip/Won't-do actions.
+- 📝 **Apple-Notes-style rich text** — a full-screen `Tiptap` editor
+  (headings, bold/italic/underline/strikethrough, text color,
+  bulleted/numbered/checklist lists), autosaving on a debounce with no
+  Save button, plus offline NLP date/time parsing (`chrono-node`) for
+  quick Tasks/Reminders entry.
 
 ## 📸 Screenshots
 
@@ -145,6 +159,24 @@ Chain streak, a refill-countdown alert, and one-tap PRN logging.
 
 </td>
 </tr>
+<tr>
+<td>
+
+**Tasks — Kanban board** — drag-and-drop columns, priority color-coded left
+borders, collapsible columns, and bulk select for move/archive.
+
+<img src="docs/screenshots/tasks-board-dark.png" alt="Tasks Kanban board" width="100%">
+
+</td>
+<td>
+
+**Tasks — Focus mode** — the "Floating Blade" glass treatment surfaces one
+task full-screen with Done/Skip/Won't-do/Schedule-for-today actions.
+
+<img src="docs/screenshots/tasks-focus-dark.png" alt="Tasks Focus mode" width="100%">
+
+</td>
+</tr>
 </table>
 
 ## 📦 What's inside
@@ -159,6 +191,8 @@ Chain streak, a refill-countdown alert, and one-tap PRN logging.
 | 🍽️ | **Food-time slots** | Named, retimeable recurring slots with a one-tap Ate/Skipped log — adherence only, no macro tracking |
 | 🗓️ | **Year in review** | Per-routine GitHub-style heatmap, pick any routine and year |
 | ⌨️ | **Command Palette** | Ctrl/Cmd+K or the toolbar search icon — search by title, jump to a date, jump to Today |
+| 📝 | **Notes** | Full-screen rich-text editor (Tiptap) — headings, bold/italic/underline/strike, color, checklists — autosaves on a debounce, no Save button |
+| ✅ | **Tasks** | Kanban board (`@dnd-kit`), lists/tags, priorities, subtasks + "Help me start" templates, bulk select, collapsible columns, glass Focus mode |
 | 🩺 | **Life — Medications** | Scheduled (multi-dose/day, any recurrence) + as-needed, Ember Chain adherence streak, refill-countdown alert |
 | 🧹 | **Life — Chores** | Recurring or one-off, fixed-schedule or reschedule-from-completion, no streak (completion-based, not habit-based) |
 | 📦 | **Life — Inventory** | Quantity tracking with a running-low flag, one tap to add a low item straight to the buy list |
@@ -170,9 +204,10 @@ Chain streak, a refill-countdown alert, and one-tap PRN logging.
 ## 🛠 Tech stack
 
 **React 19** · **TypeScript (strict)** · **Vite 5** · **Ant Design 5** ·
-**Dexie (IndexedDB)** · **Framer Motion** · **react-icons (Tabler)** ·
-**dayjs** · **vite-plugin-pwa** · optional **Convex** (schema ready, sync
-deferred) · **Vitest**
+**Dexie (IndexedDB)** · **Framer Motion** · **@dnd-kit** (Tasks board) ·
+**Tiptap** (rich-text Notes) · **react-icons (Tabler)** · **dayjs** ·
+**chrono-node** (offline NLP dates) · **vite-plugin-pwa** · optional
+**Convex** (schema ready, sync deferred) · **Vitest**
 
 ## 🚀 Quick start
 
