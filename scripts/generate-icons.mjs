@@ -97,7 +97,10 @@ function drawIcon(size, { maskable = false } = {}) {
   const bgInner = [31, 20, 8]; // #1f1408
   const bgMid = [19, 19, 19]; // #131313
   const bgOuter = [10, 10, 10]; // #0a0a0a
-  const ringColor = [255, 255, 255];
+  // Warm ash-gray (matches --border/--ash's own warmth) instead of stark
+  // white — ties the ring into the ember palette rather than reading as an
+  // unrelated neutral outline against it.
+  const ringColor = [214, 198, 182];
   const beadColor = [255, 184, 107]; // #ffb86b
   const coreColor = [255, 159, 28]; // #ff9f1c
 

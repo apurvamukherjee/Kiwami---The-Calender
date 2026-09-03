@@ -1,10 +1,23 @@
-# Kiwami Tasks (Kanban) — Stage 1 Retrospective + Stage 2/3 Plan
+# Kiwami Tasks (Kanban) — Stage 1 Retrospective + What's Actually Left
 
 This file is the single continuation document for the Tasks/Kanban feature: what
-Stage 1 shipped, every bug found and fixed while polishing it, explicit UX rough
-edges to weigh for the next pass, and the full original market research carried
-forward (nothing from the report has been dropped — each item is now annotated
-with its real status against the shipped code).
+Stage 1 shipped, every bug found and fixed while polishing it, and the full
+original market research carried forward (nothing from the report has been
+dropped — each item is annotated with its real status against the shipped code).
+
+**Status note (2026-09-03):** Parts C–F below were rewritten after a fresh,
+code-verified audit found that a substantial "Stage 2" had already shipped
+at some point after this file was last touched, without ever being logged
+here — the file was claiming things like "reminders NOT wired" and "tag
+management NOT DONE" that were, on inspection, both long since built. See
+Part C0 for what was found and why the old sections were replaced rather
+than patched. Part A/B below (Stage 1's own history) were re-checked too
+and are still accurate — no changes needed there. **Two same-day follow-up
+passes** then shipped: "wrap up Part C-D-E" (D5, bulk select, a 6th color
+swatch — one real React warning found and fixed live), and "wrap Part F +
+live-readiness" (velocity-tilt drag lift, animated column-collapse, plus
+an honest branding/bundle-size/deployment audit for the whole app). See
+the two build logs near the end of this file for the full record.
 
 ---
 
@@ -139,267 +152,480 @@ All six are fixed in the current code and re-verified passing (19/19).
 
 ---
 
-## Part C — Known Stage 1 simplifications (deliberate, not bugs)
+## Part C0 — 2026-09-03 fresh audit: Stage 2 already happened, undocumented
 
-Worth deciding explicitly in Stage 2, not silently carried forward:
+**This file's Parts C–F were stale.** Everything below them (until this
+section) was written against a Stage 1 snapshot and never revisited, even
+though a substantial "Stage 2" clearly shipped at some point since — every
+current line of code was checked directly (not inferred) before writing
+this: `TaskDto`'s real fields in `src/db/types.ts`, every file in
+`src/features/tasks/`, `src/lib/tasks.ts`, `src/lib/taskStats.ts`, and
+`src/lib/notifications.ts`. Almost none of the old "Stage 2/3, NOT STARTED"
+claims were still true. Rather than patch individual bullet points, Parts
+C–F below are rewritten from scratch against what the code actually does
+today. Nothing is dropped — every original item is still tracked, just with
+a corrected status and, where relevant, the exact file/field that proves it.
 
-- **Composer has no subtask quick-add** — subtasks are only addable from
-  `TaskDetailSheet` after creation. `NoteComposer` has a similar "not everything
-  `NoteEditorSheet` supports" gap, so this matches precedent, but it's a real gap
-  if quick task+checklist capture turns out to matter.
-- **Composer's recurrence is simplified** — only None/Daily/Weekly/Monthly, with
-  weekday (for Weekly) or day-of-month (for Monthly) auto-derived from the due
-  date rather than exposed as UI. Full control (specific weekdays, custom
-  interval/unit, end date) only exists in `TaskDetailSheet`.
-- **No tag deletion/management UI surfaced** — `deleteTaskTag`/`updateTaskTag`
-  exist in the data layer (with proper cascade cleanup of `tagIds`) but nothing
-  in the UI calls them yet; tags can only be created (inline, from the composer
-  or detail sheet) and used as filters, never renamed or removed.
-- **Per-column "+" quick-add is plain-text only** — no NLP date parsing (unlike
-  the main composer). Deliberate scope trim for a fast "type a title, hit
-  Enter" path.
-- **No bulk select / multi-task actions** (bulk archive, bulk move, bulk tag).
-- **No Tasks-specific keyboard shortcuts** beyond Cmd+K (no "n" for new task,
-  no arrow-key card navigation, no keyboard-driven column switch on mobile).
-- **No subtask reordering** — subtasks are a flat add-only-appends array.
-- **Tag color is fixed to `tokens.accent`** on inline creation (no color picker
-  at creation time) — `updateTaskTag` supports changing it later, but nothing in
-  the UI exposes that yet (ties back to the "no tag management UI" gap above).
+**What turned out to already be shipped** (see Part D for full detail on
+each): D1 (unified do/due model — `TaskDto.doDate`), D2 (planned-vs-actual
+time — `estimatedMinutes`/`actualMinutes`), D3 (energy — `TaskDto.energy`,
+wired into `FocusSheet`'s filter), D4 (Won't-Do terminal state — `wontDo`/
+`wontDoAt`), D6+D7 (deliberately merged into one `FocusSheet` — see its own
+top-of-file comment — plus `WeeklyReviewSheet`), D8 (confirmed, unchanged),
+F1 (completion burst — `TaskCard.tsx`'s `burst` animation), F2 (cold-ash
+Won't-Do rendering), F3 (upgraded to a real gradient+glow hearth pill, not
+plain text), F4 (list-cleared burst, explicitly commented `(F4)` in
+`TaskColumn.tsx`), F6 (folded into `WeeklyReviewSheet`'s "N tasks completed
+this week" pill), task reminders (`lib/notifications.ts` sweeps `db.tasks`),
+tag rename/delete/recolor (`TaskTagManager.tsx`), subtask reordering
+(drag-and-drop in `TaskDetailSheet.tsx`), composer subtask quick-add, the
+card drag-handle affordance, the board horizontal-overflow hint, per-column
+NLP quick-add, `TaskDetailSheet`'s collapsible "More details" section, and a
+`FocusSheet`/`WeeklyReviewSheet`-only "Floating Blade" glass treatment.
 
----
-
-## Part D — UX polish opportunities noticed while building/testing
-
-Concrete, specific observations from real screenshots and interaction testing —
-not hypothetical. None of these are correctness bugs; all are worth a design
-pass in Stage 2.
-
-**Desktop:**
-- No visual affordance that a card is draggable (no `cursor: grab`, no visible
-  grip handle) — the whole card is simultaneously the click-to-open target and
-  the drag surface. Works, but a user has no visual cue drag is even possible
-  until they try it. `TaskListManager`'s rows *do* have an explicit
-  `TbGripVertical` handle — worth making `TaskCard` consistent with that.
-- Empty column body just shows plain gray "No tasks" text — flatter than the
-  richer empty-state card treatment `CalendarPage`/`NotesPage` use elsewhere in
-  the app.
-- No "N more lists →" affordance if the board grows past ~5 columns and needs
-  horizontal scroll — currently just a bare `overflow-x: auto` with no visual
-  hint more content exists off-screen.
-- `TaskDetailSheet` is one long scroll (title → list → priority → tags → due
-  date → full recurrence sub-form → subtasks → description → Save → Archive).
-  The composer's "Details" collapse pattern (hide recurrence/tags behind a
-  toggle) isn't mirrored here — worth collapsing the less-frequently-touched
-  recurrence block by default, consistent with the "quick capture, details
-  collapsed" philosophy already used elsewhere.
-- Archive/Restore is silent (haptic only, no toast) while Archive-from-detail-
-  sheet *does* toast ("Archived"). `CLAUDE.md`'s Phase 2 established "toast on
-  create/save/delete, not on Done/Missed" as a deliberate rule — Restore sits in
-  ambiguous territory between those two categories and should be decided
-  explicitly rather than left inconsistent.
-- The overdue-date chip on a card just turns the date text red — Notes'
-  Timeline view has an explicit "Overdue"/"Today" text badge that's more
-  legible at a glance; worth unifying the visual language between the two.
-
-**Mobile:**
-- The composer's two `Select`s (list + priority) sit side-by-side above the
-  textarea at 390px — fits, but hasn't been tested at a genuinely small phone
-  width (360px, still a real device size); worth a pass there specifically.
-- Touch drag (`TouchSensor`, 200ms delay) was only exercised via Playwright's
-  synthetic mouse events in this verification pass, **not** a real touch-capable
-  device/emulator — the swipe-vs-drag disambiguation this relies on (see
-  `KanbanBoard.tsx`'s comments) should get a real-device pass before calling
-  Stage 1 fully done on touch specifically.
-- The mobile column tab-strip shows raw counts ("To Do 3") but no per-column
-  color-coded accent beyond the small dot — could lean further into the
-  existing ember/ash palette for stronger at-a-glance differentiation while
-  swiping.
-
-**Both:**
-- Color-swatch pickers (tag creation, list recolor) offer 4–5 fixed swatches
-  only, matching `EventEditorSheet`'s existing pattern — fine for consistency,
-  but worth reconsidering if real usage wants more than ~5 distinct tag colors.
-- "N done today" only counts non-archived tasks — a task completed and then
-  immediately archived the same day silently drops out of that count. Minor,
-  but worth deciding if it should count `lastCompletedAt` regardless of archive
-  state.
+**Genuinely still open** (unchanged verdict after re-checking): D5
+(Help-Me-Start breakdown), F5 (not applicable — no streak mechanic exists
+for tasks by design), bulk select/multi-task actions, swipe-on-card quick
+actions, velocity-tilt on drag lift, rubber-band pull-to-create, animated
+column-collapse, long-press radial menu, drag-to-dismiss bottom-sheet
+detents, shared-element (`layoutId`) transitions, and `TaskDetailSheet`
+itself never got the glass treatment (only `FocusSheet`/`WeeklyReviewSheet`
+did).
 
 ---
 
-## Part E — Full original research, carried forward with status against Stage 1
+## Market findings (context, unchanged from the original report)
 
-Nothing from the original report is dropped. Each item below is the original
-finding, annotated with **[DONE / PARTIAL / NOT STARTED]** against what actually
-shipped.
-
-### Market findings (context, unchanged)
 Paywalling basics breeds resentment (Todoist's Dec 2025 price hike) · sync/
 two-way-calendar-sync is the universal functional failure (Kiwami's local-first
 model sidesteps this for the single-user case) · mobile is a second-class
 citizen industry-wide (Trello single-column complaint, Linear mobile has no
 offline support) · missing power-user primitives (do/due dates, >3 priority
 levels, dependencies) · ADHD/neurodivergent needs unmet by mainstream apps.
+Nothing here changes with the code — market context doesn't go stale the way
+implementation-status claims do.
 
-### (i) Table-stakes — Stage 1 status
+## Table-stakes — status (re-audited 2026-09-03)
+
 - Quick capture **[DONE]** — `TaskComposer`, always-reachable, sub-5s add.
 - NLP date parsing **[DONE]** — reused `parseNoteText` as-is.
 - Lists/projects + Kanban columns **[DONE]** — `TaskListManager` + `KanbanBoard`.
-- Subtasks/checklists **[DONE]**, one level, per plan — `TaskDetailSheet`.
-- Due dates, reminders, recurrence **[PARTIAL]** — due dates + recurrence
-  (roll-forward model) done; **reminders on tasks are NOT wired** (the existing
-  `lib/notifications.ts` reminder sweep only watches the `notes` table's
-  `kind: "reminder"`, not `tasks` — a task with a due date does not fire a
-  reminder notification today).
+- Subtasks/checklists **[DONE]** — `TaskDetailSheet`, now with drag-to-reorder
+  and a composer quick-add path too (see Part D).
+- Due dates, reminders, recurrence **[DONE]** — upgraded from the old
+  "[PARTIAL], reminders NOT wired" claim: `lib/notifications.ts`'s
+  `checkDueReminders()` sweeps `db.tasks` directly (any task with a due date
+  and no `notifiedAt` fires once it passes, same as a note reminder) — this
+  was verified false in the previous file, confirmed true by reading the
+  function body directly.
 - Priorities (>3 levels) **[DONE]** — 5 levels (none/low/medium/high/urgent).
-- Tags/labels + fast filtering **[PARTIAL]** — tags + filter done; tag
-  management UI (rename/delete/recolor after creation) **NOT DONE** (Part C).
+- Tags/labels + fast filtering **[DONE]** — upgraded from "[PARTIAL], tag
+  management NOT DONE": `TaskTagManager.tsx` exists and does exactly that
+  (rename/recolor/delete, with cascade cleanup of `tagIds` on delete).
 - Search + Command Palette **[DONE]** — `useSearchTasks` merged into the
   existing palette.
 - Drag-to-reorder + drag-between-columns **[DONE]** — `@dnd-kit`, both
-  directions verified working + persisting.
-- Dark/light theming + keyboard shortcuts **[PARTIAL]** — theming fully done;
-  Tasks-specific keyboard shortcuts beyond Cmd+K **NOT DONE**.
-- Completed-task history/archive **[DONE]** — `TaskArchiveView`, restore + hard
-  delete.
-
-### (ii) Genuine differentiators — Stage 2 candidates, status
-- **D1 — Unified do-date/due-date model [NOT STARTED].** Still the single
-  highest-leverage differentiator per the report (Todoist can't do this at all;
-  fragmentation costs ~7–11 hrs/week per the cited estimates). **Now cheaper
-  than when the report was written**, because Stage 1 already built the Kanban
-  board, the recurrence engine reuse, and the `TaskDto` shape — adding a
-  `doDate` field alongside `dueDate` and a "schedule on calendar" action from
-  `TaskDetailSheet` is a materially smaller lift now than a cold start. Flag:
-  touches the calendar's tested `CalendarItem` pipeline if surfaced there — stage
-  it behind a flag if risk to that pipeline is a concern, per the report's own
-  fallback guidance.
-- **D2 — Planned-vs-actual time tracking [NOT STARTED].** No `estimatedMinutes`/
-  `actualMinutes` fields exist on `TaskDto` yet.
-- **D3 — Energy/context-aware selection [NOT STARTED].** No energy field exists.
-  Could piggyback on the existing tag system (an "energy" tag category) rather
-  than a new dedicated field — worth deciding in Stage 2 design, not assumed
-  here.
-- **D4 — First-class "Won't Do" state [NOT STARTED].** `TaskDto.completed` is
-  still binary; no third terminal state exists. The report's guidance to render
-  it as "cold ash" (extending the Ember Chain metaphor) is directly compatible
-  with the priority-color/border language `TaskCard` already uses.
-- **D5 — "Help Me Start" breakdown (template-based, no AI) [NOT STARTED].**
-- **D6 — Overwhelm-reduction Focus surface [NOT STARTED].**
-- **D7 — Guided daily plan + weekly review [NOT STARTED].**
-- **D8 — True data ownership/export [PARTIAL]** — `exportAll`/`importAll` in
-  `src/db/db.ts` already include the new `tasks`/`taskLists`/`taskTags` tables
-  for free (they iterate `db.tables` generically), so JSON export/import of
-  tasks **already works** with zero additional code. Worth explicitly
-  verifying/mentioning in Stage 2 rather than re-discovering it.
-
-### (iii) Delight features — status
-- **F1 — Kindling→flame completion burst [NOT STARTED]** — completing a task
-  today is a plain checkbox strikethrough, no ember-flourish micro-interaction.
-- **F2 — "Cold ash" for Won't-Do [NOT STARTED]** — blocked on D4 existing first.
-- **F3 — Daily "hearth" momentum indicator [PARTIAL]** — `TasksPage`'s "N done
-  today" text is the deliberately-non-streak version of this the report called
-  for; it has no visual glow/warmth treatment yet, just text.
-- **F4 — Milestone "forge" moment on clearing a list [NOT STARTED]**.
-- **F5 — Humane "streak freeze"-style grace [NOT STARTED]** — not applicable
-  until some streak-like mechanic exists for tasks, which Stage 1 deliberately
-  avoided building.
-- **F6 — "Embers earned today" weekly-review summary [NOT STARTED]** — blocked
-  on D7 (no weekly review surface exists yet).
-
-### (iv) The 10 interactive UI/UX features — status
-1. **Swipe-between-columns with snap [DONE, simplified]** — implemented via
-   plain CSS `scroll-snap` (not Framer Motion physics/rubber-band) per the plan's
-   explicit choice to keep swipe on a "native browser touch handling" channel,
-   separate from `@dnd-kit`'s drag gesture. No rubber-band overscroll animation
-   at the ends (native browser overscroll behavior only).
-2. **Swipe-on-card quick actions [NOT STARTED]** — no swipe-to-complete/
-   swipe-to-archive gesture on cards; completion is checkbox-tap-only today.
-3. **Drag lift + shadow + velocity tilt [PARTIAL]** — `DragOverlay` shows a
-   static elevated-shadow copy (`TaskCardOverlay`); no scale-up "picked up" cue
-   and no velocity-based tilt.
-4. **FLIP layout animations for list mutations [NOT STARTED]** — cards
-   currently snap to new positions; no `layout`/`AnimatePresence` smoothing on
-   add/remove/reorder/filter.
-5. **Rubber-band pull-to-create [NOT STARTED]** — quick-add is button/composer-
-   driven only, no overscroll-to-create gesture.
-6. **Animated column-collapse with count pill [NOT STARTED]** — columns are
-   always fully expanded; no collapse-to-rail affordance.
-7. **Long-press radial quick-menu [NOT STARTED]** — no long-press context menu
-   on cards; all actions require opening the full detail sheet.
-8. **Bottom-sheet detail with drag-to-dismiss [PARTIAL]** — `TaskDetailSheet`
-   already becomes a bottom sheet on mobile via the existing `Sheet.tsx`
-   convention, but has no drag-to-dismiss/velocity-snap detents (peek/half/full)
-   — it's a standard antd Modal slide-up/down, not a custom gesture sheet.
-9. **Ember completion micro-interaction + haptic [PARTIAL]** — `hapticLight()`
-   fires on checkbox toggle (Android-only, per the Vibration API constraint
-   already documented in this codebase); no visual flame-burst animation.
-10. **Shared-element card→detail / calendar transition [NOT STARTED]** — no
-    `layoutId`-based morph between a card and its detail sheet, or between a
-    task and a future calendar placement (ties to D1).
-
-### Glassmorphism guidance — status
-**[NOT APPLIED]** — Stage 1 deliberately kept the Tasks surface flat (matching
-the report's own "keep the working surface flat, glass only on floating
-overlays" guidance, and consistent with `MonthView`/`AgendaView`'s existing
-"dense grid surfaces skip heavy blur" precedent from Phase 3). Sheets (
-`TaskDetailSheet`, `TaskArchiveView`, `TaskListManager`) currently use the plain
-`Sheet.tsx` treatment, not the "Floating Blade" glass/bloom treatment
-`RoutineDetailSheet`/`CommandPalette` got in Phase 3 — worth deciding in Stage 2
-whether `TaskDetailSheet` (a "hero surface" by the report's own intensity-tier
-logic) should get that same treatment for visual consistency with
-`RoutineDetailSheet`.
-
-### Kanban-on-mobile UX guidance — status
-**[DONE]** — single-column-with-swipe + snap-scroll header strip + tap-to-jump,
-exactly as recommended, verified working in the Playwright pass.
+  directions, plus FLIP animation smoothing on top (Part F #4).
+- Dark/light theming + keyboard shortcuts **[PARTIAL]** — theming fully
+  done; a `"n"` shortcut focuses the composer (upgraded from "NOT DONE" —
+  it exists), but arrow-key card navigation and a keyboard-driven mobile
+  column switch still don't.
+- Completed-task history/archive **[DONE]** — `TaskArchiveView`, restore +
+  hard delete.
 
 ---
 
-## Part F — Recommended Stage 2/3 sequencing (updated)
+## Part C — Known simplifications (re-verified 2026-09-03, deliberate, not bugs)
 
-Given Stage 1 is now real (not hypothetical), the report's original staging
-still holds, with one adjustment: **D8 is already done for free**, so it drops
-out of the "to build" list entirely.
+- **Composer's recurrence is simplified** — only None/Daily/Weekly/Monthly
+  (`TaskComposer.tsx`), with weekday (for Weekly) or day-of-month (for
+  Monthly) auto-derived from the due date rather than exposed as UI. Full
+  control (specific weekdays, custom interval/unit, end date) only exists
+  in `TaskDetailSheet`. **Still true** — unchanged from Stage 1.
+- ~~Tag color is picked from the same 5 fixed swatches everywhere~~ —
+  **resolved 2026-09-03, see Part G's build log**: a 6th swatch
+  (`tokens.emberHot`) was added to both `TaskListManager.tsx`/
+  `TaskTagManager.tsx`'s `swatches` arrays. Still a fixed palette, never an
+  open color picker — that part of the original observation stands, just
+  with one more option than before.
+- ~~No bulk select / multi-task actions~~ — **shipped 2026-09-03**, see
+  Part G's build log.
+- **Tasks-specific keyboard shortcuts are minimal** — `"n"` focuses the
+  composer (`TasksPage.tsx`), confirmed working, but there's still no
+  arrow-key card navigation and no keyboard-driven column switch on mobile.
+  **Partially resolved** from the original "NOT DONE" claim — worth
+  correcting the record rather than re-flagging as untouched.
 
-**Stage 2 (next):**
-1. Fix the Part C/D gaps that are cheap and high-value: tag management UI,
-   composer subtask quick-add, drag-handle affordance + empty-state polish,
-   toast-consistency decision for Restore.
-2. **D1 (unified do/due model)** — the defensible moat, now cheaper to build
-   than when the report was written.
-3. **D4 (Won't-Do state)** + **F2 (cold-ash rendering)** together — low cost,
-   high signal, and they're naturally one unit of work (a new terminal state
-   plus its one visual treatment).
-4. **F1 (completion burst)** + **F3 upgrade (visual hearth, not just text)** —
-   cheap, reinforces the brand, no new data model needed.
-5. Wire task due dates into the existing reminder sweep (`lib/
-   notifications.ts`) — currently only `notes`-table reminders fire; this is a
-   real functional gap for any task with a due date, not just a nice-to-have.
+---
 
-**Stage 3:**
-6. **D3 (energy tags)** — decide tag-reuse vs. dedicated field first.
-7. **D6 (focus surface)**, **D7 (daily plan/weekly review)**, **D2 (planned-vs-
-   actual)** — deepen retention, all still genuinely unbuilt.
-8. Interactive-feature backlog items #2, #4, #6, #7, #10 from Part E(iv) —
-   pick opportunistically once the above land; FLIP animations (#4) are the
-   cheapest, highest-perceived-polish item on that list and could be pulled
-   forward if there's spare capacity in Stage 2 instead.
+## Part D — Stage 2 delivered (found during this audit, not previously logged)
 
-**What to explicitly still avoid** (unchanged from the original report): a
-second Ember Chain/streak for tasks, a points/coins/pet reward economy, glass on
-card bodies or long scrolling backgrounds, sole reliance on haptics, and any
-feature that quietly requires a server without flagging the local-first
-compromise.
+Every item below was checked directly against the current source, not
+assumed. Recorded here so it stops silently vanishing from this file's
+history the way it apparently already did once.
+
+- **D1 — Unified do/due date model: shipped.** `TaskDto.doDate` (`src/db/
+  types.ts`) exists alongside `dueDate`, independently settable via
+  `TaskDetailSheet`'s "Do date" toggle. `completeTask()` (`lib/tasks.ts`)
+  rolls a recurring task's `doDate` forward alongside `dueDate`, preserving
+  the original offset between the two (diffed in minutes via dayjs, not
+  `Date#toISOString()`, to stay in the app's local-time-string convention).
+  `useTasksForRange` keys the Calendar overlay off `doDate ?? dueDate`.
+- **D2 — Planned-vs-actual time tracking: shipped.** `estimatedMinutes`/
+  `actualMinutes` on `TaskDto`, editable in `TaskDetailSheet`'s "More
+  details" section (preset buttons — 15/30/60/90/120/240min — plus a custom
+  `InputNumber`, and a separate "actual time spent" field, editable any
+  time per the type's own comment, not just on completion — deliberately
+  not a live start/stop timer, since a background timer is unreliable the
+  moment the tab closes). `computeWeeklyStats` (`lib/taskStats.ts`, unit-
+  tested in `taskStats.test.ts`, 5 cases) turns this into an "estimate
+  accuracy" (~N% over/under) stat in `WeeklyReviewSheet`.
+- **D3 — Energy/context-aware selection: shipped.** `TaskDto.energy`
+  (`"low"|"medium"|"high"`) — a dedicated field, not a tag-naming
+  convention, per its own comment ("filterable/sortable without fragile
+  string-matching, which `FocusSheet`'s energy-match filter needs"). Set in
+  `TaskDetailSheet`'s "More details" `Segmented`; `FocusSheet`'s own energy
+  filter (`EnergyFilter`) reads it directly.
+- **D4 — First-class "Won't Do" state: shipped.** `TaskDto.wontDo`/
+  `wontDoAt`, set via `markTaskWontDo()` — mutually exclusive with
+  `completed`. Reopenable from `TaskDetailSheet` ("Reopen" button) and from
+  `FocusSheet`'s queue.
+- **D5 — "Help Me Start" breakdown: shipped 2026-09-03.** A `BREAKDOWN_TEMPLATES`
+  constant in `TaskDetailSheet.tsx` — three static, generic shapes ("Quick
+  3-step", "Research-based", "Errand"), no AI, no per-task customization,
+  exactly the original report's scope. A "Help me start" button in the
+  Subtasks section toggles a template-picker row; picking one appends its
+  steps via the same `applyBreakdownTemplate()` path the manual add-subtask
+  flow already used (always appends, never replaces existing subtasks).
+- **D6 + D7 — Focus surface + guided daily plan/weekly review: shipped, as
+  a deliberate merge.** `FocusSheet.tsx`'s own top-of-file comment: "a
+  deliberate D6+D7 merge... 'what am I doing right now' and 'what am I
+  doing today' are the same decision for a solo user, not two screens." It
+  builds a priority-and-tier-sorted queue (overdue → today → backlog,
+  filterable by energy) and surfaces one task at a time with Done/Skip/
+  Won't-do/"Schedule for today" actions — the queue *is* the guided daily
+  plan, not a separate view. `WeeklyReviewSheet.tsx` is the actual weekly-
+  review surface: a 7-day bar chart of completions (`computeWeeklyStats`),
+  a won't-do count, and the estimate-accuracy stat from D2 — explicitly
+  **not** a streak or score ("deliberately NOT a streak or gamified score...
+  matching the project's standing rule against a second Ember Chain for
+  tasks").
+- **D8 — True data ownership/export: confirmed, unchanged.**
+  `exportAll`/`importAll` cover `tasks`/`taskLists`/`taskTags` for free
+  (generic `db.tables` iteration) — still true, still needs no extra code.
+
+---
+
+## Part E — Delight features (re-audited 2026-09-03)
+
+- **F1 — Kindling→flame completion burst: shipped.** `TaskCard.tsx`'s
+  `TaskCardBody` has a `burst` state — checking a task off triggers a
+  `motion.div` radial gradient (`emberHot`→`accent`) that scales 0.3→2.6
+  and fades over 600ms, layered behind the checkbox via `AnimatePresence`.
+- **F2 — "Cold ash" for Won't-Do: shipped.** A won't-do'd `TaskCard` gets
+  `background: ${tokens.ash}14`, an ash-colored left border, and 0.55
+  opacity — the exact "cold-ash wash" the original report called for,
+  confirmed in the component's own comment ("echoes EmberChain's crater
+  fill for a missed bead").
+- **F3 — Daily "hearth" momentum indicator: shipped, upgraded beyond the
+  original ask.** `TasksPage.tsx`'s "N done today" pill is no longer plain
+  text — it's a gradient (`emberHot`→`accent`) pill with a
+  `boxShadow` glow, matching the "hearth-pill visual language"
+  `WeeklyReviewSheet.tsx`'s own comment explicitly names and reuses.
+- **F4 — Milestone "forge" moment on clearing a list: shipped.**
+  `TaskColumn.tsx` tracks each column's active-task count and fires a
+  radial-gradient burst animation on the exact `>0 → 0` transition (not on
+  every render at zero, not on a filter/reorder that leaves the count
+  unchanged) — explicitly labeled `(F4)` in its own comment.
+- **F5 — Humane "streak freeze"-style grace: still not applicable.** No
+  streak-like mechanic exists for tasks, by design (the project's standing
+  "no second Ember Chain for tasks" rule) — this stays blocked on a premise
+  Kiwami deliberately never builds, not a gap to close.
+- **F6 — "Embers earned today" weekly-review summary: shipped, folded into
+  D7.** `WeeklyReviewSheet`'s "N tasks completed this week" hearth-pill
+  header is this feature — no separate surface was needed once
+  `WeeklyReviewSheet` existed.
+
+---
+
+## Part F — The 10 interactive UI/UX features (re-audited 2026-09-03)
+
+1. **Swipe-between-columns with snap [DONE, simplified]** — unchanged: plain
+   CSS `scroll-snap` (`MobileBoard` in `KanbanBoard.tsx`), not Framer Motion
+   physics, per the original deliberate choice to keep swipe on a native-
+   touch-handling channel separate from `@dnd-kit`'s drag gesture.
+2. **Swipe-on-card quick actions [NOT STARTED — deliberately, see below].**
+3. **Drag lift + shadow + velocity tilt [DONE, 2026-09-03].**
+   `TaskCardOverlay` now applies `scale(1.04)` on pickup plus a live
+   velocity-derived tilt (`KanbanBoard.tsx`'s `onDragMove` diffs
+   `DragMoveEvent.delta.x` against the previous frame's cumulative value —
+   cheaper than tracking real timestamps — clamps it to ±8°, and feeds it
+   down as a `tilt` prop), on top of a slightly deeper shadow. Resets to 0
+   on drag start/end.
+4. **FLIP layout animations for list mutations [DONE]** — `TaskCard`'s
+   `motion.div` uses `layout={!dragActive}` (framer-motion's FLIP), disabled
+   only for the exact window a `@dnd-kit` drag is active (so the two
+   positioning systems never fight over the same `transform` in the same
+   frame — see `KanbanBoard.tsx`'s `dragActive` comment) and re-enabled the
+   instant the drag ends, covering add/remove/reorder-by-filter smoothly.
+5. **Rubber-band pull-to-create [NOT STARTED]** — unchanged, still button/
+   composer-driven only.
+6. **Animated column-collapse with count pill [DONE, 2026-09-03, desktop
+   only].** `KanbanBoard.tsx`'s `DesktopBoard` wraps each column in a
+   `motion.div` animating `width` (300px ↔ 56px, spring) based on a new
+   `collapsedListIds: Set<number>` (local board-view state, never
+   persisted — same convention as `scope`/`hideCompleted`/`selectMode`).
+   Collapsed state renders `CollapsedColumnRail` (color dot, rotated list
+   name, count pill, expand chevron) instead of the full `TaskColumn` —
+   deliberately not draggable/droppable while collapsed, since a column you
+   can't see into isn't a sensible drop target. `MobileBoard` doesn't get
+   this — its single-column swipe view has no equivalent concept.
+7. **Long-press radial quick-menu [NOT STARTED — deliberately, see below].**
+8. **Bottom-sheet detail with drag-to-dismiss [PARTIAL, unchanged]** —
+   `TaskDetailSheet` is still a standard antd Modal slide via `Sheet.tsx`,
+   no custom gesture sheet with peek/half/full detents.
+9. **Ember completion micro-interaction + haptic [DONE]** — upgraded from
+   "PARTIAL": `hapticLight()` still fires on toggle, and the visual
+   flame-burst from F1 above now exists too — the gap this item originally
+   flagged is closed.
+10. **Shared-element card→detail / calendar transition [NOT STARTED]** —
+    confirmed absent, no `layoutId` usage anywhere in `src/features/tasks/`.
+
+**#2 and #7 deliberately not attempted (2026-09-03):** both would compete
+for the *exact same* physical gesture `@dnd-kit` already owns on a
+`TaskCard` — a press-and-hold is already "pick this card up to drag"
+(`TouchSensor`'s 200ms `delay` activation constraint), so a swipe-to-
+complete gesture (#2) and a long-press context menu (#7) would each need a
+real gesture-disambiguation design (how far/fast does a swipe have to
+travel before it's not a drag-reorder? does long-press-to-menu race
+long-press-to-pick-up, and who wins?) before either is safe to build —
+not something to guess at silently. Same category of risk already flagged
+for keyboard-nav in Part C/G; recorded here rather than attempted half-built.
+
+### Glassmorphism guidance — status (re-audited)
+**[PARTIAL]**, not "[NOT APPLIED]" as previously recorded. `FocusSheet.tsx`
+and `WeeklyReviewSheet.tsx` both got the full "Floating Blade" treatment
+(`backdropFilter: blur(20px)` on the modal content + a corner gradient
+bloom) — the exact treatment `RoutineDetailSheet`/`CommandPalette` set the
+precedent for in Phase 3, applied here because both are genuine "hero
+moments" (a focused one-task-at-a-time flow; a retrospective summary), not
+dense list surfaces. `TaskDetailSheet`, `TaskListManager`, `TaskTagManager`,
+and `TaskArchiveView` still use the plain `Sheet.tsx` treatment — still an
+open call whether `TaskDetailSheet` specifically (arguably also a "hero
+surface" by the report's own intensity-tier logic, being the single most-
+visited sheet in the section) should get it too, exactly as originally
+flagged.
+
+### Kanban-on-mobile UX guidance — status
+**[DONE]**, unchanged — single-column-with-swipe + snap-scroll header strip
++ tap-to-jump, now additionally confirmed to have per-column color-tinted
+active pills (`MobileBoard`'s `tint = list.color ?? "var(--accent)"`,
+labeled `(Part A.8)` in its own comment) — closing the one remaining Part D
+mobile observation about the tab strip being color-flat.
+
+---
+
+## Part G — What's actually left (superseding the old Part F sequencing)
+
+The old "Stage 2 (next)" list is gone — every item on it shipped. Five more
+items shipped across two follow-up passes on 2026-09-03 ("wrap up Part
+C-D-E", then "wrap Part F + live-readiness") — see the build logs below.
+What remains now, roughly in order of value-per-effort:
+
+1. **Swipe-on-card (#2) and long-press radial menu (#7)** — both need a
+   real gesture-disambiguation design against `@dnd-kit`'s existing press-
+   and-hold-to-drag binding before they're safe to build; see Part F's own
+   note on this. The actual design work (not the animation) is the blocker.
+2. **`TaskDetailSheet`'s glass treatment** — the one remaining half of the
+   "Glassmorphism guidance" item; low effort (the pattern is already
+   proven twice in this same feature) if visual consistency with
+   `FocusSheet`/`WeeklyReviewSheet` starts to matter.
+3. **Bottom-sheet drag-to-dismiss detents (#8)** and **shared-element
+   card→detail transition (#10)** — both real animation work, neither
+   blocked on a gesture conflict the way #2/#7 are; #8 touches the shared
+   `Sheet.tsx` (used by every sheet in the app, so change it carefully),
+   #10 would need to reconcile with `TaskCard`'s already-tuned
+   drag-vs-FLIP `layout` gating.
+4. **Full keyboard navigation** (arrow-key card nav, keyboard column
+   switch) — `"n"` already covers quick-capture; the rest is a genuinely
+   separate, larger a11y/power-user pass. Deliberately skipped specifically
+   because it would fight `KanbanBoard.tsx`'s existing `KeyboardSensor`
+   (dnd-kit's own Space-to-pick-up/arrows-to-move drag-reorder binding) on
+   the exact same focusable cards — needs its own design pass to
+   disambiguate "navigate" from "drag" keyboard intents, not a bolt-on.
+5. **Bulk-tag** (as opposed to bulk-archive/bulk-move, both shipped) — the
+   action bar (`TasksPage.tsx`) is already shaped to add a third button if
+   this turns out to matter.
+6. **Color-swatch picker as a real open picker** — the fixed-palette
+   constraint itself (now 6 swatches instead of 5) is still there by
+   design; only worth revisiting if 6 genuinely isn't enough in practice.
+
+**What to explicitly still avoid** (unchanged from the original report,
+re-confirmed true today): a second Ember Chain/streak for tasks (F5 stays
+blocked on this by design), a points/coins/pet reward economy, glass on
+card bodies or long scrolling backgrounds (`TaskCard`/`TaskColumn` stay
+flat, correctly), sole reliance on haptics, and any feature that quietly
+requires a server without flagging the local-first compromise.
+
+---
+
+## Build log — "wrap up Part C-D-E" pass (2026-09-03)
+
+Picked up directly from Part G's numbered list as it stood after the fresh
+audit: D5, bulk select, and the 5-swatch limit — the three genuinely open
+items across Parts C/D/E that didn't need a separate product decision
+first (unlike the 1-3-5 cap or NL capture, still untouched, see the Life
+tab's own deferred list for the same category of "needs a decision" items).
+
+- **D5 shipped** — see Part D's entry above for the exact implementation.
+- **Color-swatch expansion shipped** — `tokens.emberHot` added as a 6th
+  swatch to `TaskListManager.tsx`/`TaskTagManager.tsx`, matching Part C's
+  updated entry above.
+- **Bulk select / multi-task actions shipped**: `lib/tasks.ts` gained
+  `bulkArchiveTasks(ids)`/`bulkMoveTasks(ids, listId)` (one transaction
+  each, mirroring `reorderBoard`'s existing shape). `TasksPage.tsx` gained
+  a `selectMode`/`selectedIds` pair and a "Select" toolbar toggle
+  (`TbSquareCheck`) that replaces the scope/hide-completed row with a bulk
+  action bar ("N selected" + a "Move to…" `Select` + Move/Archive/Cancel)
+  while active — forcing the board's own scope to `"all"`/hideCompleted to
+  `false` for the duration, so nothing is invisibly excluded from a bulk
+  action. Threaded through `KanbanBoard.tsx` → `TaskColumn.tsx` →
+  `TaskCard.tsx`: in select mode a card's complete-checkbox is fully
+  replaced by a plain selection checkbox (mixing "mark done" and "select
+  for bulk action" on the same tap target invites mis-taps), and
+  `useSortable`'s own `disabled: selectMode` option turns off drag entirely
+  for the duration — selecting and reordering are two different gestures on
+  the same press-and-hold surface, and letting both listen at once risked
+  an accidental reorder mid-selection.
+- **One real bug found and fixed, caught by a live Playwright pass, not
+  typecheck**: adding a `selected`-state highlight to `TaskCardBody`
+  initially set it via the `border` shorthand, in the same style object
+  that already sets `borderLeft` separately (for the priority-color
+  accent) — a real React dev-mode warning ("conflicting property... don't
+  mix shorthand and non-shorthand properties"). This exact shorthand/
+  longhand mix was already structurally present in the file before this
+  change (`border` + `borderLeft` together), but had never fired the
+  warning because `border`'s value was a static string across every
+  render; making it depend on `selectMode`/`selected` gave React two
+  different renders to compare and surfaced it. **Fixed** by dropping the
+  border-side rewrite entirely and layering a `boxShadow: "0 0 0 2px
+  var(--accent)"` ring on top of the existing (unchanged) `border`/
+  `borderLeft` instead — visually a cleaner full-ring highlight anyway, not
+  just a same-looking workaround.
+- **Verified live in a real browser** (headless Chromium, dark mode):
+  created two tasks, opened one, applied the "Research-based" D5 template
+  and confirmed the resulting subtasks rendered; confirmed the tag manager
+  now shows 6 color swatches; entered select mode, confirmed the bulk
+  action bar's Archive/Move buttons are correctly disabled at 0 selected
+  and enabled at 1, selected a card and confirmed both the "1 selected"
+  count and the card's accent ring rendered — zero console errors/warnings
+  on the final pass (one warning caught and fixed mid-pass, per above).
+- `npm run typecheck` / `npm run test` (61 tests, unchanged — this pass is
+  UI + thin CRUD wrappers over already-tested primitives, not new pure
+  logic) / `npm run build` all clean.
+
+---
+
+## Build log — "wrap Part F + live-readiness" pass (2026-09-03)
+
+Picked up Part F's two lowest-risk remaining items (#3, #6 — no gesture
+conflicts, unlike #2/#7) plus an app-wide live-readiness pass covering
+branding, bundle size, and deployment.
+
+- **#3 — drag lift + velocity tilt: shipped.** See Part F's own entry
+  above for the exact mechanism (`onDragMove` delta-diffing, clamped ±8°).
+- **#6 — animated column-collapse: shipped**, desktop only. See Part F's
+  own entry above (`CollapsedColumnRail`, `motion.div` width spring,
+  `collapsedListIds` local state).
+- **Verified live in a real browser** (headless Chromium, dark mode,
+  1440px): collapsed and re-expanded a column, confirmed the rail (color
+  dot + rotated name + count pill) renders and the board returns to normal
+  cleanly; performed a real mouse-driven drag (down → move → move → up, not
+  a synthetic event) and confirmed the `DragOverlay` ghost visibly tilts
+  and scales during the drag — zero console errors or warnings on either.
+- `npm run typecheck` / `npm run test` (61 tests) / `npm run build` all clean.
+
+### Live-readiness pass (branding, bundle, deployment)
+
+- **Icons — refined, not replaced.** `public/icons/*`/`favicon-32.png`/
+  `apple-touch-icon.png` were re-examined and are **not** a generic
+  placeholder — `scripts/generate-icons.mjs` procedurally renders Kiwami's
+  actual signature motif (the ember bead-ring + glowing core from
+  `SplashScreen.tsx`), not a stand-in shape. One real, tasteful refinement
+  made: the outer ring's color changed from stark white (`#ffffff`) to a
+  warm ash-tone (`#d6c6b6`) matching the app's own `--border`/`--ash`
+  warmth, so it reads as part of the ember palette rather than a
+  disconnected neutral outline. Regenerated all 6 output files. **What
+  this is not**: a hand-designed vector logo/wordmark — that needs either
+  a design tool this environment doesn't have, or explicit creative
+  direction/assets from the user. `CLAUDE.md`'s existing "replace before
+  shipping anywhere public" caveat is about that gap specifically, and it
+  still stands — but "placeholder" undersold what's actually there.
+- **Bundle size — audited honestly, not force-optimized.** Full breakdown
+  (gzip): `antd` 205kB, `NoteFullEditor` (Tiptap) 128kB, `index` (app
+  shell) 109kB, `motion` 38kB, `CalendarPage` 15kB, `TaskDetailSheet`
+  20kB, `parseNoteText` (chrono-node) 14kB, `LifePage`/`TasksPage`/
+  `NotesPage` 11–11kB each. The app's existing per-section `lazy()`
+  boundaries in `App.tsx` already do the real work here — Tiptap's 128kB
+  only loads if a note is actually opened, `dnd-kit`'s weight lives inside
+  `TasksPage`'s own chunk, etc. The **true critical-path cost** (loaded on
+  every visit before any section renders) is `index` + `antd` + `motion` ≈
+  351kB gzip, because `App.tsx` imports antd's `ConfigProvider`/`AntApp`
+  and wraps the splash in `AnimatePresence` at the top level, both eagerly.
+  `antd`'s 205kB reflects genuinely broad usage (Modal, Select, DatePicker,
+  Segmented, Popconfirm, the `cssinjs` theming engine, etc. across every
+  section) — not a misconfiguration; shrinking it further means using
+  fewer antd components, a real product/design decision, not a build
+  setting. **One concrete, identified-but-not-executed lever**: `motion`
+  (38kB gzip) is only in the critical path because `App.tsx` wraps
+  `SplashScreen` in `framer-motion`'s `AnimatePresence` for its exit
+  transition — `SplashScreen.tsx` itself is already pure CSS `@keyframes`
+  (per `CLAUDE.md`'s Phase 1 notes), so replacing that one `AnimatePresence`
+  wrapper with a plain CSS opacity transition (matching the existing
+  `.theme-ready` transition convention `index.css` already has) would defer
+  `motion`'s 38kB to whichever lazy section loads first instead. **Not
+  executed this pass** — `App.tsx`'s splash-mount sequence is a carefully-
+  tuned, already-shipped first impression with its own documented
+  StrictMode history elsewhere in this codebase, and a real change there
+  deserves its own dedicated verification pass, not a rushed edit inside a
+  larger multi-front turn.
+- **Deployment readiness — confirmed, not executed.** Kiwami has no router
+  and no backend (Convex is schema-only), so there is genuinely no special
+  server config needed: `npm run build` → `dist/` is a fully self-contained
+  static PWA deployable to any static host (Vercel, Netlify, Cloudflare
+  Pages, GitHub Pages, S3+CloudFront, etc.) with zero SPA-fallback-rewrite
+  rules needed (there's no client-side routing to fall back for) and zero
+  environment variables. `vite.config.ts` has no custom `base` — correct
+  for a custom domain or a host that serves from the root path; would only
+  need `base: "/<repo-name>/"` for a GitHub Pages *project* site
+  specifically (not a custom domain or a Vercel/Netlify deploy). Verified
+  by actually running `npm run preview` against the current production
+  build and confirming both the app and its `manifest.webmanifest` serve
+  correctly. **Actually deploying anywhere was deliberately not done** —
+  it needs the user's own hosting account/credentials and an explicit
+  choice of host, both squarely outside what this session can or should
+  decide unilaterally.
+- `npm run typecheck` / `npm run test` (61 tests) / `npm run build` all
+  clean as the final state of this pass.
 
 ---
 
 ## Critical files for continuation
-- `src/db/types.ts`, `src/db/db.ts` — schema (currently v3)
-- `src/lib/tasks.ts`, `src/lib/taskRecurrence.ts` (+ its test) — data layer
-- `src/features/tasks/*.tsx` — the page and all its components
+
+- `src/db/types.ts`, `src/db/db.ts` — schema (currently v5; Tasks landed at
+  v3, later grown in place — no further version bump needed for anything
+  documented above, it's all existing fields)
+- `src/lib/tasks.ts`, `src/lib/taskRecurrence.ts`, `src/lib/taskStats.ts`
+  (+ their tests) — data layer
+- `src/features/tasks/*.tsx` — the page and all its components, including
+  `FocusSheet.tsx`/`WeeklyReviewSheet.tsx`/`TaskTagManager.tsx` (all real,
+  all shipped — not aspirational despite this file's old status claims)
+- `src/components/ColorSwatchPicker.tsx` — shared swatch-picker, extracted
+  from `TaskListManager.tsx`, now also used by `TaskTagManager.tsx`
 - `src/App.tsx`, `src/components/CommandPalette.tsx`, `src/components/
   BottomNav.tsx`, `src/components/SectionTabs.tsx` — integration points
-- `src/lib/notifications.ts` — currently notes-only; the Stage 2 reminder-sweep
-  gap noted above lives here
+- `src/lib/notifications.ts` — sweeps both `notes` and `tasks` reminders;
+  the Life tab (Phase 7, see `LIFE_TAB_FEATURE_PLAN.md`) later added a third
+  sweep for medications here too, same file
 - The approved Stage 1 plan (data model + component design rationale in full):
   `C:\Users\apurv\.claude\plans\peppy-riding-perlis.md`

@@ -3,7 +3,7 @@ import { Input, Button } from "antd";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { TbPlus, TbListCheck } from "react-icons/tb";
+import { TbPlus, TbListCheck, TbChevronLeft } from "react-icons/tb";
 import { createTask, taskMatchesFilter, type TaskScopeFilter } from "../../lib/tasks";
 import { parseNoteText } from "../../lib/parseNoteText";
 import { todayKey } from "../../lib/date.utils";
@@ -21,9 +21,18 @@ interface Props {
   dragActive: boolean;
   scope: TaskScopeFilter;
   hideCompleted: boolean;
+  // Bulk-select mode (Part G) — see TaskCard.tsx for how a card itself
+  // renders while this is active.
+  selectMode?: boolean;
+  selectedIds?: Set<number>;
+  onToggleSelect?: (id: number) => void;
+  // Desktop-only column collapse (Part F #6) — undefined on mobile, where
+  // the concept doesn't apply (KanbanBoard.tsx only ever passes it from
+  // DesktopBoard).
+  onCollapse?: () => void;
 }
 
-export function TaskColumn({ list, taskIds, tasksById, tags, onOpenTask, dragActive, scope, hideCompleted }: Props) {
+export function TaskColumn({ list, taskIds, tasksById, tags, onOpenTask, dragActive, scope, hideCompleted, selectMode, selectedIds, onToggleSelect, onCollapse }: Props) {
   const tokens = useTokens();
   const { setNodeRef, isOver } = useDroppable({ id: listDndId(list.id!) });
   const [addOpen, setAddOpen] = useState(false);
@@ -111,6 +120,9 @@ export function TaskColumn({ list, taskIds, tasksById, tags, onOpenTask, dragAct
         </span>
         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", fontFamily: "var(--font-mono)", position: "relative" }}>{visibleIds.length}</span>
         <Button type="text" size="small" icon={<TbPlus size={14} />} onClick={() => setAddOpen((v) => !v)} aria-label={`Add task to ${list.name}`} style={{ position: "relative" }} />
+        {onCollapse && (
+          <Button type="text" size="small" icon={<TbChevronLeft size={14} />} onClick={onCollapse} aria-label={`Collapse ${list.name}`} style={{ position: "relative" }} />
+        )}
       </div>
 
       {addOpen && (
@@ -138,7 +150,18 @@ export function TaskColumn({ list, taskIds, tasksById, tags, onOpenTask, dragAct
           {taskIds.map((id) => {
             const task = tasksById.get(id);
             if (!task || !visibleIds.includes(id)) return null;
-            return <TaskCard key={id} task={task} tags={tags} onOpen={() => onOpenTask(id)} dragActive={dragActive} />;
+            return (
+              <TaskCard
+                key={id}
+                task={task}
+                tags={tags}
+                onOpen={() => onOpenTask(id)}
+                dragActive={dragActive}
+                selectMode={selectMode}
+                selected={selectedIds?.has(id)}
+                onToggleSelect={() => onToggleSelect?.(id)}
+              />
+            );
           })}
         </SortableContext>
       </div>

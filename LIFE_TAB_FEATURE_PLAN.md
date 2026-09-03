@@ -1,8 +1,11 @@
 # Kiwami "Life" Tab — Build Plan
 
-**Status: COMPLETE — all phases A-L shipped.** See §11's checklist (all
-boxes checked) and §11a's Build Log for the full record: four real bugs
-found by actually driving the browser and fixed (a weekly-recurrence-with-
+**Status: COMPLETE — all phases A-L shipped, plus Phase M** (Now/Focus zone
+expanded to multiple items + per-category progress badges) **and Phase N**
+(Today/This Week/All scope control), both drawing on Appendix B below. See
+§11's checklist (all boxes checked) and §11a's Build Log for the full
+record: four real bugs found by
+actually driving the browser and fixed (a weekly-recurrence-with-
 no-weekday-selected data-loss bug, a React-StrictMode Dexie `BulkError`
 race, a same-day-doses-auto-missed-too-early ordering bug, and a PWA
 font-precache gap), 61 tests passing (up from 48), zero console errors on
@@ -905,6 +908,85 @@ retrospectives — kept here until Phase L folds a condensed version into
 - `npm run typecheck` / `npm run test` (61 tests) / `npm run build` all
   clean as the final state.
 
+### Phase M — Home-tab UX refinements from Appendix B (shipped)
+
+Not one of the original A-L phases — added after a second research pass
+(Appendix B, appended in §15) supplied concrete, low-risk UX rules worth
+adopting immediately regardless of the still-open Life+Tasks merge
+question. See §15 for the full reasoning on what was extracted vs. left
+as a recorded-but-undecided product call.
+
+- `TodayDigest.tsx`'s old single-item "Now / Next" row became a real
+  **"Now / Focus" zone**: up to `FOCUS_ZONE_CAP` (5) items — medications
+  and calendar events still due today, chronological — plus the single
+  highest-priority (`urgent`/`high`) still-open task due today folded in
+  at the end with an untimed "Today" slot, tappable straight to Tasks via
+  the existing `onGoToTask`.
+- **Per-category progress badges** ("x/y", `Section`'s new optional
+  `progress` prop) added to the Medications and Tasks section headers —
+  deliberately quiet (`font-mono`, `--ink-soft`), deliberately not a
+  competing score against the Ember Chain. Chores' section was
+  deliberately left without one — its rolling `dueDate` on completion
+  makes "x/y" ambiguous without a separate query that wasn't worth adding
+  for a badge (see §15 for the full reasoning).
+- **Verified**: `npm run typecheck` / `npm run test` (61 tests, unchanged
+  — this is presentation logic over already-tested data, not new pure
+  logic) clean. Live in a real browser (dark mode): confirmed the
+  Medications progress badge correctly reads "1/1" after logging a dose,
+  confirmed the Now/Focus zone correctly renders nothing (no crash) when
+  every candidate item is already in the past or already resolved — zero
+  console errors either way.
+
+### Phase N — Today / This Week / All scope control (shipped)
+
+Picked from §15's deferred list as the next phase (Low complexity, no big
+product decision required — matching Appendix B's own complexity rating).
+
+- `TodayDigest.tsx` gained a `DigestScope = "today" | "week" | "all"`
+  state, switched via an antd `Segmented` next to the day header. Header
+  title/subtitle and the empty-state message all adapt per scope ("Thursday
+  / 3 September 2026" → "This Week / 3 Sep – 9 Sep 2026" → "Everything
+  open / Not scoped to a date — the full Calendar tab has the real grid").
+- **Schedule**: `useCalendarEvents(today, rangeEnd)` — already a generic
+  range query, so widening it for "week" (today+6) / "all" (today+30,
+  deliberately bounded — an literally-unbounded digest query isn't a
+  digest anymore, the full Calendar tab exists for that) needed zero
+  changes to the hook itself. Rows show a date prefix (`D MMM`) instead of
+  just a time once scope isn't "today".
+- **Tasks**: "today"/"week" scope extend the existing inline date-window
+  filter (unchanged shape, just a wider upper bound); "all" scope reuses
+  **`taskMatchesFilter(t, "all", true, today)` from `lib/tasks.ts`
+  verbatim** — the exact same predicate `TasksPage`'s own board-level
+  "Today/Recurring/All" filter already uses, so "All" here means the same
+  thing it means on the actual Tasks board (every open task, undated/
+  recurring included), not a second definition of "all."
+- **Chores**: `useTodayChores()` (unchanged) still powers "today"; "week"/
+  "all" compute inline from the newly-imported `useChores()` (all chores),
+  filtering out archived/completed and, for "week," bounding `dueDate` to
+  the range.
+- **Shopping**: "today"/"week" stay scoped to `urgency: "now"` (a full
+  shopping list isn't a "what's coming up" concept); "all" broadens to
+  every not-yet-bought buy-list item.
+- **Medications deliberately did NOT get a scope-aware query** — kept as
+  "today's occurrences" regardless of scope. A medication's schedule is a
+  today/PRN concept; showing a real week of per-day dose rows would need
+  its own grouped-by-day UI, a materially bigger lift than this phase's
+  "Low complexity" scope, so it's left as an explicit, documented
+  simplification rather than half-built.
+- **Now/Focus zone and the catch-up strip are scoped to `"today"` only**
+  and hidden entirely otherwise — "what's due right now" doesn't mean
+  anything while browsing a week-wide or all-time view; not a bug, a
+  deliberate gate (`scope === "today" && ...`).
+- **Verified live in a real browser** (dark mode): created a chore due 3
+  days out and one due 20 days out, confirmed via the DOM (not just a
+  screenshot read) that **Today** scope shows neither, **This Week** shows
+  only the 3-day-out one, and **All** shows both — all six assertions
+  passed exactly as designed. Zero console errors across every scope
+  switch.
+- `npm run typecheck` / `npm run test` (61 tests, unchanged — scope
+  filtering is presentation logic reusing already-tested predicates, not
+  new pure logic needing its own test) / `npm run build` all clean.
+
 ## 12. Open calls left for implementation time (deliberately not pre-decided)
 
 - Exact icon choice for the Life tab in `BottomNav`/`SectionTabs`
@@ -1163,3 +1245,230 @@ implementation, or ask again at that point.
 - The **"3–4 concurrent backdrop-filter layers" ceiling** is a practical mobile figure synthesized from multiple 2026 sources (some cite 5–8 on flagship hardware). It is not a hard spec number — profile on your actual target devices; it's a starting budget, not a guarantee.
 - `env(safe-area-inset-*)` returning `0` in some portrait Safari / cold-start scenarios is a documented WebKit inconsistency; PWA standalone mode (Kiwami's install target) is the more reliable environment, but test both.
 - Framer Motion is now published as **`motion`** (`motion/react`); the API in this prompt is current for both the legacy `framer-motion` and new `motion` package names — match whichever is already in the Kiwami `package.json`.
+
+---
+
+## 15. Note on Appendix B below — read before acting on it, and before re-reading Appendix A's §13 note
+
+Appendix B is kept **verbatim**, per the same instruction as Appendix A.
+Read it alongside §13's note on Appendix A, because **this is now the
+second independent research pass recommending the same architectural
+change**: merging Life and Tasks into one "Home" tab, with Calendar/Notes
+staying separate (Appendix A argued this from a glassmorphism/mobile-UX
+angle; Appendix B argues it from a product/IA angle — "Keep Life/Todo as an
+optional filter chip, not a primary split — data stays unified underneath,"
+"the Life-vs-Todo split the merge is meant to eliminate"). §0.1's locked
+decision — Life stays its own 4th tab, Calendar stays home — has **not**
+been revisited or changed by either appendix landing in this file. Two
+research passes recommending the same merge is a real signal worth the
+user's attention next time this file is picked up, but it is still their
+call to make, not a default this plan silently adopts.
+
+**One thing worth noting explicitly**: most of Appendix B's "MUST show on
+Home" list is *already satisfied* by the shipped `TodayDigest` (Phase F)
+regardless of how the merge question resolves — medications, routines/
+food/events (via Calendar's `useCalendarEvents`), tasks (via `useTasks`),
+chores, and shopping/inventory nudges are all already unified into one
+scrollable daily view. The merge question mainly still matters for whether
+the **full Kanban board** (not just today's slice of tasks) also needs to
+live on that one screen, and for the nav-level "how many top-level tabs"
+decision — not for whether the daily-digest content itself needs rebuilding.
+
+### What was extracted from Appendix B and built now (low-risk, no IA decision needed)
+
+- **A real multi-item "Now / Focus" zone**, replacing the old single-item
+  "Now / Next" row — up to `FOCUS_ZONE_CAP` (5) items, timed items
+  (medications + calendar events) in chronological order, plus the single
+  highest-priority (`urgent`/`high`) still-open task due today folded in at
+  the end with an untimed "Today" slot — implementing Appendix B's rule
+  "the one big task is eligible for the focus zone regardless of time."
+  Working-memory research cap (Cowan 2001, Oberauer 2019) taken directly
+  from Appendix B's own citation.
+- **Per-category quiet progress badges** ("x/y") on the Medications and
+  Tasks section headers in `TodayDigest` — explicitly implementing
+  Appendix B's "category-specific, NOT a unified day score" recommendation.
+  This is a deliberate confirmation, not new philosophy: the Ember Chain
+  was already the sole momentum signal everywhere else in this app: these
+  badges are a small, glanceable secondary readout that cannot be mistaken
+  for a second gamification system.
+- Chores' section deliberately did **not** get a progress badge — a
+  chore's `dueDate` rolls forward the instant it's completed (see
+  `completeChore()`), so "x due today" and "x completed today" aren't the
+  same denominator the way they are for medications/tasks; a badge here
+  would need its own separate `lastCompletedAt`-based query to mean
+  anything honest, which felt like manufacturing a metric rather than
+  surfacing one that was already meaningful. Left for a future pass if it
+  turns out to matter.
+- **"Why is this here?" transparency was found to already be satisfied**,
+  not something new to build: `InventoryItemRow`'s "⚠ Running low" badge
+  and `BuyListRow`'s "Now" urgency tag — both already reused verbatim in
+  `TodayDigest` since Phase F — already are the one-line reason a rule-
+  surfaced item is showing up. No new UI was needed.
+
+### What's recorded here as planned-but-not-built (each is a real product decision, not a low-risk add)
+
+- **Natural-language quick capture with inline type detection** for Life
+  items (medications/chores/inventory/wishlist) — genuinely new
+  infrastructure (a parser + a type-guessing heuristic + editable type
+  chips), nothing to extend. Today, every Life domain is still explicit
+  "Add X" buttons + a full form, matching the rest of this app's existing
+  CRUD-sheet convention. Desktop's Command Palette (`Ctrl/Cmd+K`) already
+  is a form of quick-jump, not quick-capture — worth revisiting together.
+- **A 1-3-5 capacity cap + gentle "that's a full day" nudge** on the
+  Now/Focus zone or the Tasks section — a real, opinionated product
+  decision about how hard to push back on an over-full day, not something
+  to default into silently.
+- ~~A Today / This Week / All segmented scope control~~ — **built, see
+  Phase N below.**
+- **Guided morning-planning / evening-shutdown rituals** (two-tap, per
+  Appendix B — explicitly not a mandatory wizard) — a genuinely new
+  interaction pattern this app doesn't have anywhere yet.
+- **"≥3 rollovers → suggest breakdown"** and **"streak-at-risk" nudges** —
+  both need new tracking (a rollover counter per task; a "is today's window
+  closing" check per routine) that doesn't exist yet.
+- **The Life+Tasks Home-tab merge itself** — unchanged from §13: still an
+  open decision, not defaulted into.
+
+---
+
+## Appendix B — Unified Home Tab: Best-in-Class Features & End-to-End User Flow (verbatim)
+
+### Executive Summary
+- The single biggest decision is philosophical: the Home tab should be a **commitment surface, not a dumping ground**. As Tazmine's widely-cited Medium review ("Things 3 Has Been on My Mac for 4 Years") puts it, in Things 3 "nothing appears in Today unless you put it there on purpose. Four years in, that single design choice is still the reason I open the app. The Today view is a daily contract with myself." That is the opposite of Todoist, where (per the same review) "your Today view fills up with everything you've ever optimistically scheduled." Kiwami should adopt an intention-based Today with automatic-but-reviewable surfacing.
+- Adopt a **hybrid information architecture**: a short interleaved "Now/Focus" zone at the top (chronological, all item types mixed), followed by collapsible category sections (Meds, Routines, Food, Tasks) below. This matches Tiimo's own positioning — Tiimo "brings your calendar, tasks, and routines into one flexible space" (tiimoapp.com) — while respecting the fact that meds/routines are better grouped by day-part and tasks by priority.
+- Use **ONE quick-capture entry point with natural-language parsing plus a lightweight type hint**, not four separate add flows and not a pure type-picker. Todoist's natural-language Quick Add is repeatedly called the "gold standard" (alfred_ and Max-Productive.ai 2026 reviews) and "the single biggest reason Todoist captures more tasks than most alternatives."
+- For momentum, use **category-specific indicators (Kiwami's Ember Chain plus small per-category progress) rather than a single unified "day score."** Apple's activity rings work because they separate goals; as StepMelon's analysis notes, a combined/opaque signal can be "confusing or even anxiety-inducing" and "the frustration can outweigh the motivation." Avoid building a second gamification system that competes with the Ember Chain.
+- Enforce a **hard capacity limit and guilt-free rollover.** The 1-3-5 rule (1 big, 3 medium, 5 small = 9 items max) directly addresses overwhelm; guilt-free rollover ("no flashing red, no overdue badge") is now standard in ADHD-friendly planners and aligns with the Ember Chain's "habit strength not zero-reset" philosophy.
+- Keep detail, configuration, analytics, and the full Kanban board OFF the home screen; surface only today's actionable items and route everything else to secondary views.
+
+### Feature Prioritization: Must-Show-on-Home vs. Must-Be-Secondary
+
+#### MUST show on the Home/Today screen
+1. **A "Now / Focus" zone at the very top** — 3-5 items maximum, interleaving whatever is most time-relevant right now across all types (an overdue medication, the current food slot, the day's one big task). Working-memory research puts the realistic ceiling at 3-5 chunks under load (Cowan 2001, Oberauer 2019); multiple apps converge on a ~5-item focus zone (Google Tasks best practice, per TasksBoard: "no more than five starred tasks at any time"). *(Complexity: Medium)*
+2. **Day momentum via the Ember Chain + small per-category progress** — reuse the existing signature visualization; do not invent a competing score. *(Complexity: Low–Medium, reuses existing engine)*
+3. **Time-relevant medications with one-tap "Taken/Skip"** — logging must be single-tap; per Done Dose's app comparison, "if logging a dose takes more than a single tap, you won't do it consistently." *(Complexity: Low)*
+4. **Today's routines/habits with Ember Chain streak state** — already built; surface the pulsing "today" state and any streak-at-risk items. *(Complexity: Low)*
+5. **Current/next food-time slot with Ate/Skipped logging** — already built. *(Complexity: Low)*
+6. **Today's tasks, capped and ordered** — due-today + overdue + manually pinned, capped ~9 per the 1-3-5 rule. *(Complexity: Medium)*
+7. **One quick-capture button (natural language)** — persistent, e.g., a FAB or the existing Cmd+K palette on desktop. *(Complexity: Medium–High)*
+8. **A scope segmented control (Today / This Week / All)** — 2-4 options, filtering the same view. *(Complexity: Low)*
+9. **Guilt-free overdue handling inline** — a gentle "carry forward / done / skip" affordance, no red shame states. *(Complexity: Medium)*
+
+#### MUST be secondary / detail-view (NOT on home)
+- Full Kanban board with all columns/swimlanes (route to the Todo page).
+- Inventory management, wishlist, buy-list master lists (surface only auto-generated "running low → buy" nudges on home).
+- Medication schedules, dosages, refill config, adherence charts.
+- Routine creation/editing and recurrence rules.
+- Calendar Month/Week grid views (already their own tab).
+- Analytics/history, settings, theming.
+- Task detail: subtasks, notes, attachments (open on tap into a detail sheet).
+- Anything requiring configuration or multi-field forms.
+
+Dashboard research is unanimous here: per GammaUX, "displaying too much information at once leads to user overload, increases cognitive load, and hampers readability"; the fix is "first showing the most relevant information and general metrics, then progressively revealing more specific data." As UXpilot's dashboard guide argues, every element "should trace back to a specific decision someone needs to make."
+
+### Recommended End-to-End User Journey
+
+#### Morning open (the "plan / orient" moment)
+1. App opens directly to the **Today** scope. The user sees, top-to-bottom: (a) a one-line day header with the Ember Chain state and a soft summary; (b) the **Now/Focus zone** (3-5 items); (c) collapsible category sections below.
+2. **Optional lightweight planning ritual** — inspired by Sunsama's guided planning ("see your entire day at a glance and reduce context-switching") and Things' "daily contract," but far lighter: a single prompt to confirm/pin today's items and to flag the one "big" task (the "1" in 1-3-5). This is a prompt, not a mandatory multi-step wizard — Sunsama's own users report often skipping heavy rituals when tired or on mobile.
+3. **Capacity feedback**: if the user pins more than ~9 items, show a gentle "that's a full day" nudge. This mirrors Sunsama, which (per the widely reproduced review) "will literally warn you if you're planning too much… if your planned tasks add up to 9 hours, the app basically says 'Hey, maybe rethink this?'" — but never a hard block.
+
+#### Throughout the day (the "engage" moment)
+4. The **Now/Focus zone updates as time passes** — the current food slot, a medication due now, the next routine. This is Kiwami's answer to time-collision: instead of a calendar grid, use **strict chronological ordering with untimed items collected below**, the mainstream rule. Google Tasks groups untimed items under a "NO DATE" category at the bottom; Things sinks "This Evening" items to their own bottom section ("still present, so you know there's more to do, but unobtrusive"); Structured parks untimed items in an Inbox ("all of your tasks that don't have a specific date or time"). Sunsama uniquely lets users place unscheduled tasks explicitly above or below scheduled ones — worth offering as a setting.
+5. **Mid-task interactions are all one-gesture**: tap-to-complete (with a satisfying confirmation — Tiimo's "confetti explosion … provides a moment of positive reinforcement"), swipe to snooze/reschedule (single-column-with-swipe, already decided), long-press for detail. Per Tiimo's design team, drag-and-drop rescheduling "makes rescheduling feel direct and manageable, without navigating complex menus."
+6. **Conflict/collision handling without a timeline**: when a routine, food slot, medication, and task all fall in the same window, group them under a single time-bucket header (e.g., a "Now" or day-part header) and order meds/health items first (health-critical), then routines, then food, then tasks. Day-part headers ("Morning/Afternoon/Evening") are a validated pattern specifically for meds/habits/routines (used by habit apps like "Productive"), whereas task/agenda apps favor strict chronological order. Never show more than the focus-zone cap in the "now" bucket; overflow goes to "Later."
+
+#### End of day (the "review / wind-down" moment)
+7. A **short, optional shutdown review** modeled on Sunsama's daily shutdown ("review what got done, reschedule what didn't, and actually close out your workday") and Tiimo's "Review Today" ("check what's left and never lose a task") — but two-tap, not a ritual. The user sees what's done, what's left, and a single "carry forward everything / pick individually" choice.
+8. **Guilt-free rollover**: unfinished tasks move forward with, in the words of the Taskful Day planner, "no flashing red. No overdue badge. No analytics card titled 'what you failed to do.'" This is the task-side analog of the Ember Chain's ash-not-guilt philosophy. Note the known trade-off (per Colter Reed and Tiimo user feedback): auto-rollover can silently swell the list, so pair it with the ≥3-rollover breakdown nudge (rule 12 below).
+9. **Momentum close**: show the Ember Chain's end-of-day state and any milestones reached (7/30/100/365). Do NOT surface a punitive "you completed X%."
+
+### Recommended "Add New Item" Flow: Hybrid (Natural Language + Type Hint)
+
+**Recommendation: ONE capture field with natural-language parsing, plus inline type detection the user can override — NOT four separate flows and NOT a pure modal type-picker.**
+
+Justification:
+- A single low-friction capture point is the highest-leverage capture design. Per Calmevo's guide, "the lower the friction of adding a task the more tasks get added before they're forgotten." Critically for Kiwami, "natural language parsing happens on-device … You can create tasks with full natural language input without an internet connection" — perfectly aligned with local-first/offline-first.
+- Todoist is the acknowledged "gold standard" for this (alfred_ 2026: "Todoist is the gold standard for simple task management… natural language input, cross-platform sync, and a design that stays out of your way"; Max-Productive.ai 2026: "Todoist remains the gold standard… Its best-in-class natural language input").
+- Pure auto-detection is unreliable across many item types (per The Sweet Setup, Todoist "does expect a certain order when you type out tasks"), and Kiwami has five+ types (task/routine/food/med/wishlist). So pair parsing with a **visible, editable type chip**. Emulate Todoist's real-time feedback: per Max-Productive.ai, "the recognized elements appear as colored pills below the task title. No other task manager handles natural language this accurately." Kiwami's parser guesses the type ("💊 med", "🔁 routine", "✅ task") and highlights recognized dates/times inline, and the user taps to correct.
+- Reserve **structured mini-forms only for genuinely structured types** (a medication needs dosage/schedule; a routine needs recurrence). The pattern: capture in natural language → if type = med/routine, expand a small type-specific sheet; if type = task/food/wishlist, save instantly. This keeps the common case one-line while handling recurrence complexity.
+- On desktop, the existing **Command Palette (Cmd+K)** should double as the capture bar.
+
+### Recommended Smart "Today" Surfacing Logic (Implementable Rules)
+
+Model the "Today" list as a computed smart list (like TickTick/Todoist/Things) but bias toward intention over pure due-date flooding. Concrete, local-only, non-AI rules:
+
+**Inclusion rules (what surfaces on Today):**
+1. Any item with a start/due/scheduled date == today (per Vanja Petreski's Things 3 guide: "If the start date, deadline, or repeating rule of any to-do matches today, it shows up here").
+2. Any overdue task (surfaced gently, grouped, not red) — TickTick's Today list arranges "all overdue and today's tasks."
+3. Any routine/habit whose recurrence fires today.
+4. Any medication dose scheduled today.
+5. Any food-time slot for today.
+6. Any item **manually pinned** to today (the intentional "daily contract" path).
+7. **Rule-based cross-feature nudges** (see below), shown as a distinct, dismissible "suggestions" row.
+
+**Ordering rules:**
+8. Timed items in strict chronological order; untimed items collected in a bottom bucket (Google Tasks "NO DATE"; Things "Anytime/This Evening").
+9. Within the same time window: health-critical (meds) → routines → food → tasks.
+10. The single "big" task (1-3-5) is eligible for the Now/Focus zone regardless of time.
+
+**Cross-feature intelligence (rule-based, no AI, no server):**
+11. **Low-stock → buy-list nudge**: when an inventory item's quantity drops below its threshold, auto-suggest adding it to the buy-list. This is a proven local pattern: the Home Assistant simple_inventory integration "automatically add[s] items to a todo list when stock drops below a threshold," and consumer apps like Stockly and Home Stock auto-move "low-stock items … to your shopping list."
+12. **Overdue-N-times → suggest breakdown**: if a task has rolled over ≥3 times, gently offer "break this into smaller steps" — echoing the ADHD principle (The Center for ADHD) to "shrink the task until it feels ridiculously doable."
+13. **Streak-at-risk warning**: if a routine's Ember Chain is active and today's window is closing unfulfilled, show a gentle "keep your chain" nudge (analogous to Apple Watch's end-of-day "close your rings" prompt) — best-effort web-only per Kiwami's decided reminder constraint.
+
+**Transparency rule:**
+14. For any item that surfaces via a rule rather than an explicit date/pin, attach a tiny "why is this here?" affordance — a one-line reason ("Suggested: you're low on coffee"). This follows the documented "why am I seeing this" pattern (Facebook's "Why am I seeing this post?", per the Understanding Recommenders write-up): as UX University frames it, "one clear reason, available when the user wants it." Do not explain items the user explicitly scheduled — that would be noise.
+
+### Recommended Day-Momentum / Gamification Decision: Category-Specific (NOT a Unified Score)
+
+**Recommendation: Keep the Ember Chain as the hero signal and add small per-category progress indicators; do NOT create a single unified "day score."**
+
+Justification:
+- A single opaque number is risky. Apple's Activity rings succeed precisely because they **separate** goals into distinct rings, and even then, as StepMelon notes, for some users rings are "confusing or even anxiety-inducing" and "the frustration can outweigh the motivation." Compressing meds + routines + food + tasks into one number would hide which dimension needs attention and could feel punishing. (Macworld similarly reports researchers saying the ring model "works because it turns behavior change into a simple daily goal system," but "won't be true for everyone.")
+- Kiwami already has a beloved, differentiated signal (the Ember Chain, "habit strength not zero-reset guilt"). Adding a second competing scoring system risks incoherence — a core design failure mode. The Ember Chain should remain the emotional centerpiece; other categories get quiet, glanceable progress (e.g., "2/3 meds", "1/2 meals") without a leaderboard or aggregate grade.
+- Medication and food adherence specifically should **not** be gamified with streaks-as-pressure. The med-reminder app Pause Moment states on its homepage, "We count pauses, not streaks. Streaks turn into guilt," and its ADHD guide warns "the broken-streak red badge can intensify shame about a moment that already carried it." Use neutral progress, not a score, for health categories.
+- If a single "at-a-glance day state" is wanted, express it **qualitatively** (a warm ember glow that fills as the day progresses) rather than a numeric percentage — keeping it consistent with the Ember Chain metaphor and avoiding a "what you failed to do" framing.
+
+### Recommended Information Architecture: Hybrid (Interleaved "Now" + Category Sections)
+
+Of the three options — (a) filtered separate views, (b) fully interleaved, (c) hybrid — **choose (c) hybrid.**
+
+- **Top: interleaved Now/Focus zone** (all types mixed, chronological, 3-5 items). This gives the "single pane of glass" that unified-dashboard research calls for and matches how Tiimo/Amie blend types on one screen.
+- **Below: collapsible category sections** (Meds, Routines, Food, Tasks, plus a dismissible Suggestions row). Rationale: meds/routines are best grouped by day-part; tasks by priority; forcing all into one flat interleaved list loses these natural groupings, while fully separate tabs recreate the Life-vs-Todo split the merge is meant to eliminate.
+- **Scope switching via a segmented control** (Today / This Week / All) at the top. Segmented controls are the right pattern here because (per Mobbin and Design Systems) they "filter or change the presentation within the same view" (as in Apple Music, and Google Calendar's Day/Week/Month, which "changes how the same calendar is drawn, not what it contains"), and best practice is 2-5 mutually exclusive options that stay visible. Keep Life/Todo as an **optional filter chip**, not a primary split — data stays unified underneath, following Superlist's "sphere toggle" model where one switch hides a whole domain "without moving anything."
+
+Consumer precedent for a home screen that mixes work + life while staying calm is strong: Superlist users repeatedly praise that "the app isn't overloaded — it has exactly what's needed," and its icon badge can be configured to show only "due and overdue tasks from your Today view." A borrowed structural metaphor worth noting is "Now/Next/Later" — implemented literally by the iOS app Do Next ("Now, Next, Later, Someday … Widget shows tasks that you need to do now") and by Logseq's NOW/LATER task markers — though it originates as ProdPad's product-roadmap framework (Janna Bastow) and is always exactly three buckets.
+
+### Complexity Ratings Summary (given React 19 + Dexie + AntD 5 + Framer Motion stack)
+- Now/Focus zone (computed, reactive): **Medium**
+- Ember Chain reuse + per-category progress: **Low–Medium**
+- One-tap med/routine/food logging: **Low**
+- Capped, ordered Today task list: **Medium**
+- Natural-language quick capture + type chips: **Medium–High** (NL date parsing is the main effort; can start with a dayjs-based parser)
+- Segmented scope control (AntD Segmented): **Low**
+- Guilt-free rollover engine: **Medium** (needs a rollover job at day boundary in Dexie)
+- Low-stock → buy-list rule: **Medium**
+- Overdue-N-times → breakdown suggestion: **Low–Medium**
+- Streak-at-risk nudge: **Low–Medium** (best-effort web-only reminders already decided)
+- "Why is this here?" transparency line: **Low**
+
+### Anti-Patterns / Things to Avoid
+1. **Do NOT flood Today with every dated item** (the "Todoist problem"). Bias toward intention + a hard cap (~9 via 1-3-5).
+2. **Do NOT build a second gamification/score system** that competes with the Ember Chain.
+3. **Do NOT use red "overdue"/shame states or a "% you failed" card.** Guilt-free rollover only.
+4. **Do NOT gamify medication/food adherence with pressure-streaks** ("streaks turn into guilt").
+5. **Do NOT put configuration, master lists, analytics, or the full Kanban board on Home** — progressive disclosure to detail views.
+6. **Do NOT force four+ separate add flows.** One capture, hybrid parsing.
+7. **Do NOT exceed 3-5 items in the focus zone** or ~5-7 visible sections — respect chunking limits.
+8. **Do NOT build a literal calendar-grid timeline on Home** — use chronological agenda grouping with untimed items at the bottom.
+9. **Do NOT explain items the user explicitly scheduled** — reserve "why is this here?" for rule-surfaced items only.
+10. **Do NOT make the planning/shutdown rituals mandatory or long** — they must be skippable two-tap prompts.
+
+### Caveats
+- Most cited sources are vendor docs, app-store listings, and UX practitioner writeups rather than peer-reviewed studies; treat specific quantitative claims (e.g., TickTick's "reduces task-scanning time by 1.9 seconds") as vendor marketing, not established fact.
+- The "Now/Next/Later" section pattern has consumer-app precedent (Do Next, Logseq) but originates as a product-roadmapping framework (ProdPad/Bastow); it's a borrowed metaphor, not an established consumer daily-planner standard. If adopted, keep to exactly three buckets.
+- The "cap at 3-5 chunks" guidance rests on working-memory research (Cowan 2001, Oberauer 2019) synthesized by UX writers; NN/G notes that for fully-visible scannable lists you are not bound by 7±2 (recognition vs. recall), so the cap applies to the decision/focus zone, not the whole scrollable agenda.
+- Kiwami's no-backend constraint means all "smart" surfacing must be local rule-based logic; none of the AI features referenced (Sunsama/Tiimo/Todoist AI, Structured's Replan/AI) should be assumed available.
+- Reminder reliability is already constrained to best-effort web-only; streak-at-risk and time-collision nudges inherit that limitation.
+- Amie's exact untimed-ordering behavior is documented only in secondary reviews, not its own primary docs; its model essentially makes everything timed via time-blocking, which Kiwami is explicitly avoiding.

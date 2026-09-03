@@ -16,12 +16,20 @@ const ENERGY_ICON = { low: TbBattery1, medium: TbBattery2, high: TbBolt };
 interface BodyProps {
   task: TaskDto;
   tags: TaskTagDto[];
+  // Bulk-select mode (TasksPage's "Select" toggle, Part G) — while active,
+  // the card's own complete-checkbox is replaced by a plain selection
+  // checkbox and the whole card body becomes the select target instead of
+  // opening the detail sheet. `selected`/`onToggleSelect` are only ever
+  // both present or both absent, together with `selectMode`.
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 // Shared visual rendering between the sortable in-column card and the DragOverlay
 // ghost copy — the overlay must NOT call useSortable itself (it's a floating visual
 // duplicate, not a second draggable registration for the same id).
-function TaskCardBody({ task, tags }: BodyProps) {
+function TaskCardBody({ task, tags, selectMode, selected, onToggleSelect }: BodyProps) {
   const tokens = useTokens();
   const [burst, setBurst] = useState(false);
   const priorityColor = tokens[PRIORITY_TOKEN_KEY[task.priority]];
@@ -44,19 +52,34 @@ function TaskCardBody({ task, tags }: BodyProps) {
         borderLeft: `3px solid ${task.wontDo ? tokens.ash : priorityColor}`,
         borderRadius: 10,
         padding: "8px 10px",
-        opacity: dimmed ? 0.55 : 1,
+        opacity: dimmed && !selectMode ? 0.55 : 1,
+        // A full ring via boxShadow, not a border-side rewrite — touching
+        // individual border sides here would mean mixing the `border`
+        // shorthand above with per-side longhand overrides in the same
+        // style object, which React's dev mode warns about ("conflicting
+        // property") the instant either value changes across a rerender.
+        // boxShadow layers over the existing border cleanly instead.
+        boxShadow: selectMode && selected ? "0 0 0 2px var(--accent)" : "none",
       }}
     >
       {/* Visual-only drag affordance — the whole card is still the drag
           surface (see TaskCard's {...listeners} below); this just signals
-          that fact, since the card had no such cue before. */}
-      <TbGripVertical size={14} style={{ position: "absolute", top: 6, right: 6, color: "var(--ink-soft)", opacity: 0.4, cursor: "grab" }} />
+          that fact, since the card had no such cue before. Hidden in select
+          mode, where the card isn't draggable (see TaskCard's dragActive gate). */}
+      {!selectMode && (
+        <TbGripVertical size={14} style={{ position: "absolute", top: 6, right: 6, color: "var(--ink-soft)", opacity: 0.4, cursor: "grab" }} />
+      )}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
         {/* A plain wrapper (not a prop on Checkbox — antd's CheckboxProps doesn't
             expose onPointerDown) stops the pointerdown here so dnd-kit's drag sensor
             never arms from a checkbox tap. */}
         <span onPointerDown={(e) => e.stopPropagation()} style={{ marginTop: 1, display: "flex", position: "relative" }}>
-          {task.wontDo ? (
+          {selectMode ? (
+            // Select mode replaces the complete-checkbox entirely — selecting
+            // a task for a bulk action is a different decision than marking
+            // it done, and offering both at once invites mis-taps.
+            <Checkbox checked={!!selected} onClick={(e) => e.stopPropagation()} onChange={() => onToggleSelect?.()} />
+          ) : task.wontDo ? (
             // Won't-do is only reopened from TaskDetailSheet (mirrors how
             // Archive is already sheet-only) — no checkbox interaction here.
             <TbBan size={15} style={{ color: tokens.ash }} />
@@ -182,8 +205,12 @@ interface CardProps extends BodyProps {
   dragActive: boolean;
 }
 
-export function TaskCard({ task, tags, onOpen, dragActive }: CardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: taskDndId(task.id!) });
+export function TaskCard({ task, tags, onOpen, dragActive, selectMode, selected, onToggleSelect }: CardProps) {
+  // Cards aren't draggable while select mode is active — dragging and
+  // multi-selecting are two different gestures on the same tap-and-hold
+  // surface, and letting both listen at once invites an accidental reorder
+  // mid-selection. `disabled` fully turns off useSortable's own listeners.
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: taskDndId(task.id!), disabled: selectMode });
   return (
     <motion.div
       ref={setNodeRef}
@@ -197,16 +224,32 @@ export function TaskCard({ task, tags, onOpen, dragActive }: CardProps) {
       }}
       {...attributes}
       {...listeners}
-      onClick={() => { if (!isDragging) onOpen(); }}
+      onClick={() => {
+        if (isDragging) return;
+        if (selectMode) onToggleSelect?.();
+        else onOpen();
+      }}
     >
-      <TaskCardBody task={task} tags={tags} />
+      <TaskCardBody task={task} tags={tags} selectMode={selectMode} selected={selected} onToggleSelect={onToggleSelect} />
     </motion.div>
   );
 }
 
-export function TaskCardOverlay({ task, tags }: BodyProps) {
+// Part F #3 — a "picked up" scale cue + velocity-based tilt (`tilt`, degrees,
+// fed live from KanbanBoard's onDragMove) layered on top of the existing
+// static shadow, so the ghost copy reads as something physically lifted and
+// carried rather than just a translucent duplicate sliding around flat.
+export function TaskCardOverlay({ task, tags, tilt = 0 }: BodyProps & { tilt?: number }) {
   return (
-    <div style={{ boxShadow: "0 12px 28px rgba(0,0,0,0.28)", cursor: "grabbing", borderRadius: 10 }}>
+    <div
+      style={{
+        boxShadow: "0 16px 32px rgba(0,0,0,0.32)",
+        cursor: "grabbing",
+        borderRadius: 10,
+        transform: `scale(1.04) rotate(${tilt}deg)`,
+        transition: "transform 120ms ease-out",
+      }}
+    >
       <TaskCardBody task={task} tags={tags} />
     </div>
   );

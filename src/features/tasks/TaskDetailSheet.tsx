@@ -3,7 +3,7 @@ import { Button, Input, Select, Switch, InputNumber, Segmented, Popconfirm, App,
 import dayjs from "dayjs";
 import {
   TbArchive, TbPlus, TbX, TbRepeat, TbFlag, TbBan, TbArrowBackUp, TbCalendarEvent,
-  TbBattery1, TbBattery2, TbBolt, TbClock, TbChevronDown, TbChevronUp, TbGripVertical,
+  TbBattery1, TbBattery2, TbBolt, TbClock, TbChevronDown, TbChevronUp, TbGripVertical, TbBulb,
 } from "react-icons/tb";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
@@ -28,6 +28,15 @@ const ENERGY_OPTIONS: { label: ReactNode; value: EnergyChoice }[] = [
   { label: <span style={{ display: "flex", alignItems: "center", gap: 4 }}><TbBolt size={13} /> High</span>, value: "high" },
 ];
 const ESTIMATE_PRESETS = [15, 30, 60, 90, 120, 240];
+
+// D5 breakdown templates — three generic shapes, not tied to any task type
+// (no AI, no per-task customization; that's the entire point per the
+// original report's "template-based, no AI" scope).
+const BREAKDOWN_TEMPLATES: { label: string; steps: string[] }[] = [
+  { label: "Quick 3-step", steps: ["Get started", "Make progress", "Finish up"] },
+  { label: "Research-based", steps: ["Research", "Draft", "Review", "Finalize"] },
+  { label: "Errand", steps: ["Gather what's needed", "Do it", "Confirm it's done"] },
+];
 
 interface Props {
   open: boolean;
@@ -60,6 +69,7 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
   const [doDateValue, setDoDateValue] = useState(todayKey());
   const [subtasks, setSubtasks] = useState<TaskSubtaskDto[]>([]);
   const [newSubtask, setNewSubtask] = useState("");
+  const [helpMeStartOpen, setHelpMeStartOpen] = useState(false);
   const [repeat, setRepeat] = useState<RepeatChoice>("none");
   const [weekdays, setWeekdays] = useState<number[]>([]);
   const [dayOfMonth, setDayOfMonth] = useState(1);
@@ -87,6 +97,7 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
     setHasDoDate(!!task.doDate);
     setDoDateValue(task.doDate ? task.doDate.slice(0, 10) : task.dueDate ? task.dueDate.slice(0, 10) : todayKey());
     setSubtasks(task.subtasks);
+    setHelpMeStartOpen(false);
     const rule = task.recurrence;
     setRepeat(rule?.type ?? "none");
     setWeekdays(rule?.weekdays ?? []);
@@ -114,6 +125,15 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
     if (!t) return;
     setSubtasks((prev) => [...prev, { id: crypto.randomUUID(), title: t, done: false }]);
     setNewSubtask("");
+  }
+  // D5 — "Help Me Start" breakdown (TASKS_FEATURE_PLAN.md Part D/G):
+  // template-based, no AI — a static set of generic shapes covering common
+  // task types, per the ADHD principle to "shrink the task until it feels
+  // ridiculously doable." Always appends (never replaces existing
+  // subtasks), same as the manual add-subtask path above.
+  function applyBreakdownTemplate(steps: string[]) {
+    setSubtasks((prev) => [...prev, ...steps.map((title) => ({ id: crypto.randomUUID(), title, done: false }))]);
+    setHelpMeStartOpen(false);
   }
   function toggleSubtask(id: string) {
     setSubtasks((prev) => prev.map((s) => (s.id === id ? { ...s, done: !s.done } : s)));
@@ -267,7 +287,28 @@ export function TaskDetailSheet({ open, onClose, task, lists, tags }: Props) {
         )}
 
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", marginBottom: 6 }}>Subtasks</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-soft)" }}>Subtasks</div>
+            <Button type="text" size="small" icon={<TbBulb size={13} />} onClick={() => setHelpMeStartOpen((v) => !v)}>
+              Help me start
+            </Button>
+          </div>
+          {helpMeStartOpen && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+              {BREAKDOWN_TEMPLATES.map((t) => (
+                <button
+                  key={t.label}
+                  onClick={() => applyBreakdownTemplate(t.steps)}
+                  style={{
+                    padding: "5px 10px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                    border: "1px solid var(--border)", background: "var(--surface)", color: "var(--ink)",
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
           <DndContext sensors={subtaskSensors} collisionDetection={closestCenter} onDragEnd={onSubtaskDragEnd}>
             <SortableContext items={subtasks.map((s) => s.id)} strategy={verticalListSortingStrategy}>
               {subtasks.map((s) => (

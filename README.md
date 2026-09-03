@@ -187,6 +187,33 @@ npm run preview        # serve /dist to verify the installed/offline experience
 npm run test            # vitest — recurrence, streak, medication/inventory logic, etc. (61 tests)
 ```
 
+## ☁️ Deploying
+
+Kiwami is a fully static PWA — no router, no backend (the Convex schema in
+`convex/` isn't wired to any function yet), so there's genuinely nothing
+server-side to configure:
+
+```bash
+npm run build   # -> dist/, a fully self-contained static site + service worker
+```
+
+Deploy the `dist/` folder to any static host — **Vercel, Netlify, Cloudflare
+Pages, GitHub Pages, or a plain S3/CloudFront bucket all work with zero
+extra config**, since there's no client-side routing that needs an
+SPA-fallback rewrite rule. A couple of things worth knowing:
+
+- `vite.config.ts` has no custom `base` (defaults to `/`) — correct for a
+  custom domain or any host that serves from the root. Only a **GitHub
+  Pages project site** (e.g. `you.github.io/kiwami`, not a custom domain)
+  needs `base: "/kiwami/"` added before building.
+- The install prompt, offline support, and app icons are all already wired
+  (`vite-plugin-pwa`, `public/manifest.webmanifest`, `public/icons/*`) —
+  nothing extra needed for "Add to Home Screen" to work once it's live on
+  HTTPS (every host above provides that automatically).
+- Run `npm run preview` after building to sanity-check the production
+  build locally (with the real service worker, not the dev server) before
+  pushing it anywhere.
+
 ## 🧱 Architecture
 
 ```

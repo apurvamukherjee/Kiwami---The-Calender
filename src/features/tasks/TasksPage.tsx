@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import dayjs from "dayjs";
-import { Button, Input, Segmented, Switch } from "antd";
-import { TbArchive, TbListDetails, TbTags, TbFlame, TbTarget, TbChartBar, TbRepeat, TbSun } from "react-icons/tb";
+import { Button, Input, Segmented, Switch, Select, Popconfirm, App } from "antd";
+import { TbArchive, TbListDetails, TbTags, TbFlame, TbTarget, TbChartBar, TbRepeat, TbSun, TbSquareCheck, TbX, TbFolderSymlink } from "react-icons/tb";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useTokens } from "../../hooks/useTokens";
 import { SectionTabs } from "../../components/SectionTabs";
@@ -14,7 +14,10 @@ import { TaskTagManager } from "./TaskTagManager";
 import { TaskArchiveView } from "./TaskArchiveView";
 import { FocusSheet } from "./FocusSheet";
 import { WeeklyReviewSheet } from "./WeeklyReviewSheet";
-import { useTasks, useTaskLists, useTaskTags, ensureDefaultTaskLists, groupTasksByList, type TaskScopeFilter } from "../../lib/tasks";
+import {
+  useTasks, useTaskLists, useTaskTags, ensureDefaultTaskLists, groupTasksByList,
+  bulkArchiveTasks, bulkMoveTasks, type TaskScopeFilter,
+} from "../../lib/tasks";
 import type { TaskDto } from "../../db/types";
 
 const SCOPE_OPTIONS = [
@@ -43,6 +46,7 @@ export function TasksPage({
 }: Props) {
   const isMobile = useIsMobile();
   const tokens = useTokens();
+  const { message } = App.useApp();
   const tasks = useTasks();
   const archivedTasks = useTasks({ includeArchived: true });
   const lists = useTaskLists();
@@ -62,10 +66,46 @@ export function TasksPage({
   // away from "All"/"show completed" when a full-board view is wanted.
   const [scope, setScope] = useState<TaskScopeFilter>("today");
   const [hideCompleted, setHideCompleted] = useState(true);
+  // Bulk-select mode (Part G of TASKS_FEATURE_PLAN.md) — a board-view
+  // concern like scope/hideCompleted above, not a data-scoping one.
+  // Selected ids are cleared on every mode toggle so leaving select mode
+  // never leaves a stale selection armed the next time it's re-entered.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [moveToListId, setMoveToListId] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     void ensureDefaultTaskLists();
   }, []);
+
+  function toggleSelectMode() {
+    setSelectMode((v) => !v);
+    setSelectedIds(new Set());
+  }
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  async function handleBulkArchive() {
+    const ids = [...selectedIds];
+    await bulkArchiveTasks(ids);
+    message.success(`${ids.length} task${ids.length === 1 ? "" : "s"} archived`);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+  }
+  async function handleBulkMove() {
+    if (moveToListId == null) return;
+    const ids = [...selectedIds];
+    await bulkMoveTasks(ids, moveToListId);
+    message.success(`${ids.length} task${ids.length === 1 ? "" : "s"} moved`);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    setMoveToListId(undefined);
+  }
 
   const anySheetOpen = detailOpen || listManagerOpen || tagManagerOpen || archiveOpen || focusOpen || weeklyReviewOpen;
 
@@ -162,6 +202,10 @@ export function TasksPage({
         )}
         <Button type="text" size="small" icon={<TbTarget size={16} />} onClick={() => setFocusOpen(true)} aria-label="Focus" />
         <Button type="text" size="small" icon={<TbChartBar size={16} />} onClick={() => setWeeklyReviewOpen(true)} aria-label="Weekly review" />
+        <Button
+          type={selectMode ? "primary" : "text"} size="small" icon={<TbSquareCheck size={16} />}
+          onClick={toggleSelectMode} aria-label={selectMode ? "Exit select mode" : "Select tasks"}
+        />
         <Button type="text" size="small" icon={<TbListDetails size={16} />} onClick={() => setListManagerOpen(true)} aria-label="Manage lists" />
         <Button type="text" size="small" icon={<TbTags size={16} />} onClick={() => setTagManagerOpen(true)} aria-label="Manage tags" />
         <Button type="text" size="small" icon={<TbArchive size={16} />} onClick={() => setArchiveOpen(true)} aria-label="Archive" />
@@ -169,16 +213,42 @@ export function TasksPage({
 
       <TaskComposer lists={lists} tags={tags} textAreaRef={composerRef} />
 
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-        padding: "8px 16px", borderBottom: "1px solid var(--border)", flexWrap: "wrap", flexShrink: 0,
-      }}>
-        <Segmented size="small" value={scope} onChange={(v) => setScope(v as TaskScopeFilter)} options={SCOPE_OPTIONS} />
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>Show completed</span>
-          <Switch size="small" checked={!hideCompleted} onChange={(v) => setHideCompleted(!v)} />
+      {selectMode ? (
+        // Bulk-action bar (Part G) — replaces the scope/hideCompleted row
+        // while select mode is active, since filtering the board and
+        // bulk-acting on a selection are mutually exclusive moments.
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+          padding: "8px 16px", borderBottom: "1px solid var(--border)", flexWrap: "wrap", flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>{selectedIds.size} selected</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <Select
+              size="small" placeholder="Move to…" style={{ minWidth: 140 }}
+              value={moveToListId} onChange={setMoveToListId}
+              options={lists.map((l) => ({ label: l.name, value: l.id }))}
+            />
+            <Button size="small" icon={<TbFolderSymlink size={13} />} disabled={selectedIds.size === 0 || moveToListId == null} onClick={handleBulkMove}>
+              Move
+            </Button>
+            <Popconfirm title={`Archive ${selectedIds.size} task${selectedIds.size === 1 ? "" : "s"}?`} okText="Archive" onConfirm={handleBulkArchive} disabled={selectedIds.size === 0}>
+              <Button size="small" danger icon={<TbArchive size={13} />} disabled={selectedIds.size === 0}>Archive</Button>
+            </Popconfirm>
+            <Button size="small" icon={<TbX size={13} />} onClick={toggleSelectMode}>Cancel</Button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+          padding: "8px 16px", borderBottom: "1px solid var(--border)", flexWrap: "wrap", flexShrink: 0,
+        }}>
+          <Segmented size="small" value={scope} onChange={(v) => setScope(v as TaskScopeFilter)} options={SCOPE_OPTIONS} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>Show completed</span>
+            <Switch size="small" checked={!hideCompleted} onChange={(v) => setHideCompleted(!v)} />
+          </div>
+        </div>
+      )}
 
       <div style={{ flex: 1, minHeight: 0 }}>
         {lists.length === 0 ? (
@@ -186,7 +256,11 @@ export function TasksPage({
             Setting up your board…
           </div>
         ) : (
-          <KanbanBoard lists={lists} grouped={grouped} tasksById={tasksById} tags={tags} onOpenTask={openTask} scope={scope} hideCompleted={hideCompleted} />
+          <KanbanBoard
+            lists={lists} grouped={grouped} tasksById={tasksById} tags={tags} onOpenTask={openTask}
+            scope={selectMode ? "all" : scope} hideCompleted={selectMode ? false : hideCompleted}
+            selectMode={selectMode} selectedIds={selectedIds} onToggleSelect={toggleSelect}
+          />
         )}
       </div>
 

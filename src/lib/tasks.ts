@@ -132,6 +132,28 @@ export async function deleteTaskForever(id: number): Promise<void> {
   await db.tasks.delete(id);
 }
 
+// Bulk actions for TasksPage's select-mode action bar (Part G of
+// TASKS_FEATURE_PLAN.md). One transaction each, mirroring reorderBoard's
+// existing shape — skips no-op writes isn't needed here since every id in
+// `ids` is, by construction, a task the user explicitly selected.
+export async function bulkArchiveTasks(ids: number[]): Promise<void> {
+  const now = Date.now();
+  await db.transaction("rw", db.tasks, async () => {
+    for (const id of ids) await db.tasks.update(id, { archived: true, archivedAt: now, updatedAt: now });
+  });
+}
+
+export async function bulkMoveTasks(ids: number[], listId: number): Promise<void> {
+  const now = Date.now();
+  await db.transaction("rw", db.tasks, async () => {
+    const siblings = await db.tasks.where("listId").equals(listId).toArray();
+    let order = siblings.reduce((max, t) => Math.max(max, t.order), -1) + 1;
+    for (const id of ids) {
+      await db.tasks.update(id, { listId, order: order++, updatedAt: now });
+    }
+  });
+}
+
 // Single write path for KanbanBoard's onDragEnd — commits every column's final task
 // order (and listId, for cross-column moves) in one transaction, skipping no-op writes.
 export async function reorderBoard(columns: { listId: number; taskIds: number[] }[]): Promise<void> {

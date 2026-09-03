@@ -22,7 +22,9 @@ export function TaskTagManager({ open, onClose, tags }: Props) {
   const tokens = useTokens();
   const { message } = App.useApp();
   const [newName, setNewName] = useState("");
-  const swatches = [tokens.accent, tokens.gold, tokens.teal, tokens.danger, tokens.ash];
+  // 6 swatches, up from 5 (Part C/G) — matches TaskListManager.tsx's
+  // identical expansion; never `diamond` (reserved for streak milestones).
+  const swatches = [tokens.accent, tokens.emberHot, tokens.gold, tokens.teal, tokens.danger, tokens.ash];
   // Same content-only-sheet focus fix as TaskListManager/TaskArchiveView —
   // antd's Modal focus-trap doesn't reliably move focus into a dialog with
   // no autoFocus field on open, and removing a row steals focus with it.

@@ -25,7 +25,11 @@ export function TaskListManager({ open, onClose, lists }: Props) {
   const tokens = useTokens();
   const { message } = App.useApp();
   const [newName, setNewName] = useState("");
-  const swatches = [tokens.accent, tokens.gold, tokens.teal, tokens.danger, tokens.ash];
+  // 6 swatches, up from 5 (Part C/G) — added emberHot, a visually distinct
+  // lighter ember shade already in the palette, rather than inventing a new
+  // color. Still never `diamond` (reserved exclusively for streak
+  // milestones — see theme.ts).
+  const swatches = [tokens.accent, tokens.emberHot, tokens.gold, tokens.teal, tokens.danger, tokens.ash];
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   // See TaskArchiveView.tsx's identical fix — antd's Modal focus-trap doesn't
   // reliably move focus into a content-only dialog (no autoFocus field) on open,

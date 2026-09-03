@@ -16,12 +16,13 @@ Signature: **Kiwami** · tagline **"Own your days"** · signature **"by Apurva"*
 
 ## Stack
 
-React 19 + TypeScript (strict) + Vite 5 + Ant Design 5 + Dexie (IndexedDB v2)
-+ Framer Motion + `react-icons/tb` (Tabler, zero `@ant-design/icons`) + dayjs
-+ `chrono-node` (offline NLP date/time parsing, Notes composer) +
+React 19 + TypeScript (strict) + Vite 5 + Ant Design 5 + Dexie (IndexedDB v5)
++ Framer Motion + `@dnd-kit` (Tasks board drag/reorder) + `@tiptap` (Notes
+rich text) + `react-icons/tb` (Tabler, zero `@ant-design/icons`) + dayjs +
+`chrono-node` (offline NLP date/time parsing, Notes/Tasks composers) +
 `vite-plugin-pwa` + optional Convex (schema only, sync deferred). No
-router — two top-level sections (Calendar/Notes) toggled by local state, not
-a route. `vitest` for unit tests.
+router — four top-level sections (Calendar/Notes/Tasks/Life) toggled by
+local state, not a route. `vitest` for unit tests.
 
 ## Run / build / test
 
@@ -30,8 +31,10 @@ npm install
 npm run dev         # --host --port 5173, prints LAN URL for phone testing
 npm run build        # tsc -b && vite build — must be clean before any change is done
 npm run typecheck     # tsc -b --noEmit
-npm run test          # vitest run — recurrence + streak suites, 18 tests
-npm run preview       # serves /dist, used to verify the PWA/offline behavior
+npm run test          # vitest run — 61 tests across recurrence/streak/tasks/medications/etc.
+npm run preview       # serves /dist, used to verify the PWA/offline behavior — also how
+                      # this app is checked for deployment-readiness (see "Deploying"
+                      # in README.md); no server config needed, it's a static PWA
 ```
 
 ## Architecture
@@ -114,14 +117,38 @@ src/
       NoteEditorSheet.tsx     Edit/delete an existing note/task/reminder
       NoteListItem.tsx        One row, shared by NotesPage's lists and the Calendar
                               Agenda-view overlay
+    tasks/                    Kanban board (Stage 1 built here; substantial further work
+                              shipped without ever being logged until a 2026-09-03 audit
+                              caught it — see TASKS_FEATURE_PLAN.md for the full,
+                              corrected record, not this summary)
+      TasksPage.tsx           Shell: toolbar + TaskComposer + KanbanBoard, plus the
+                              bulk-select action bar (Part G)
+      KanbanBoard.tsx/TaskColumn.tsx/TaskCard.tsx   Desktop multi-column vs. mobile
+                              single-column-swipe, @dnd-kit drag/reorder, FLIP animations,
+                              velocity-tilt drag lift, desktop column collapse
+      TaskDetailSheet.tsx     Full editor: priority/tags/subtasks (reorderable, quick-add,
+                              "Help me start" breakdown templates)/due+do dates/recurrence/
+                              energy/time-estimate
+      FocusSheet.tsx/WeeklyReviewSheet.tsx   One-task-at-a-time queue (merges "focus
+                              surface" + "guided daily plan") / retrospective stats —
+                              both get the "Floating Blade" glass treatment
+      TaskListManager.tsx/TaskTagManager.tsx/TaskArchiveView.tsx   List & tag CRUD
+                              (shared `ColorSwatchPicker.tsx`), archive/restore
+    life/                     See "Phase 7 — Life tab" below
   components/
-    BottomNav.tsx             Mobile-only 2-tab (Calendar/Notes) bar — a normal flex child
-                              in App.tsx, not position:fixed (see Phase 4)
-    SectionTabs.tsx           Desktop-only Calendar/Notes Segmented, dropped into each
-                              page's own toolbar
-public/icons/, favicon-32.png, apple-touch-icon.png   Procedurally generated placeholder
-                              PNGs (solid ember-colored ring motif) — replace with real
-                              branding before shipping anywhere public.
+    BottomNav.tsx             Mobile-only 4-tab (Calendar/Notes/Tasks/Life) bar — a normal
+                              flex child in App.tsx, not position:fixed (see Phase 4)
+    SectionTabs.tsx           Desktop-only Calendar/Notes/Tasks/Life Segmented, dropped
+                              into each page's own toolbar
+public/icons/, favicon-32.png, apple-touch-icon.png   Procedurally rendered via
+                              scripts/generate-icons.mjs — this **is** Kiwami's actual
+                              signature motif (the ember bead-ring + glowing core from
+                              SplashScreen.tsx), refined 2026-09-03 (warmed the ring color
+                              to match --border/--ash), not a generic stand-in shape. Still
+                              not a hand-designed vector logo/wordmark — that needs either
+                              a design tool or explicit creative direction, neither
+                              available in-session; replace before shipping anywhere public
+                              if a hand-crafted mark ever matters more than the procedural one.
 ```
 
 ## Data model — the key scoping decision
@@ -236,15 +263,44 @@ without a schema rewrite — but nothing calls it yet).
 
 ## Honest scope-outs / known limitations
 
-- **Placeholder PWA icons** — `public/icons/*.png`, `favicon-32.png`,
-  `apple-touch-icon.png` are procedurally generated (a solid ember-colored
-  ring, no actual logo/wordmark) via a one-off Node/zlib script, not real
-  branding. Replace before shipping anywhere public.
-- **Ant Design bundles as one ~635kB (201kB gzip) chunk** — `vite build`
-  warns about this (grew from ~524kB in Phase 1 with Phase 2's added
-  `Popconfirm`/`DatePicker`/`Select`/`Empty` usage). No code-splitting has
-  been done; fine for a personal local-first app, worth revisiting with
-  `manualChunks`/dynamic `import()` if the bundle ever needs to shrink.
+- **PWA icons are procedural, not hand-designed** — `public/icons/*.png`,
+  `favicon-32.png`, `apple-touch-icon.png` render Kiwami's real signature
+  motif (the ember bead-ring + glowing core, via `scripts/
+  generate-icons.mjs`, refined 2026-09-03 to warm the ring color into the
+  ember palette) — genuinely on-brand, not a generic stand-in shape, but
+  still not a hand-crafted vector logo/wordmark. Fine as-is; revisit only
+  if a hand-designed mark specifically matters before shipping anywhere
+  public.
+- **Ant Design bundles as one ~649kB (205kB gzip) chunk**, already its own
+  `manualChunks` entry in `vite.config.ts` — audited 2026-09-03 and
+  confirmed this reflects genuinely broad component usage (Modal, Select,
+  DatePicker, Segmented, Popconfirm, the `cssinjs` theming engine, etc.
+  across every section), not a misconfiguration; shrinking it further means
+  using fewer antd components, a product decision, not a build setting.
+  The real remaining lever: `framer-motion` (38kB gzip) is in the
+  *critical* (always-loaded) path only because `App.tsx` wraps
+  `SplashScreen` in `AnimatePresence` for its exit transition —
+  `SplashScreen.tsx` itself is already pure CSS `@keyframes`, so that one
+  wrapper could become a plain CSS opacity transition (matching
+  `index.css`'s existing `.theme-ready` pattern) to defer `motion` to
+  whichever lazy section loads first. Identified, not executed — `App.tsx`'s
+  splash-mount sequence is a carefully-tuned first impression with its own
+  StrictMode history (see `useBackClose` above); a change there deserves
+  its own dedicated verification pass. Every section-specific chunk
+  (Tiptap, `@dnd-kit`, `chrono-node`, etc.) already loads only behind
+  `App.tsx`'s per-section `lazy()` boundaries — this was already working
+  as intended before the 2026-09-03 audit, just never confirmed in writing.
+- **Deployment is genuinely simple, and was verified but not executed** —
+  no router, no backend, so `npm run build` → `dist/` is a self-contained
+  static PWA deployable to any static host with zero server config (no
+  SPA-fallback rewrite needed — there's no client-side routing to fall
+  back for). `vite.config.ts` has no custom `base`, correct for a custom
+  domain or a host serving from `/`; only a GitHub Pages *project* site
+  (not a custom domain) would need `base: "/<repo-name>/"`. Confirmed via
+  a real `npm run preview` against the production build — the app and its
+  `manifest.webmanifest` both serve correctly. Actually deploying
+  anywhere is intentionally left to the user (their hosting account, their
+  choice of host) — never attempted in-session.
 - **No drag-and-drop reschedule for recurring events** (see above) and no
   drag-to-create in Month view (cells are too small to grab reliably —
   same reasoning Zenith's own Month view uses).
@@ -750,3 +806,26 @@ production build (`vite preview`, a real registered service worker, not
 the dev server) — a genuine offline reload with the network fully
 disabled, twice in a row to also confirm the StrictMode-race fix holds
 under repeated real mounts. Zero console errors on every pass, in the end.
+
+**Post-launch refinement**: a second research pass (a Home-tab UX report,
+recorded in full in `LIFE_TAB_FEATURE_PLAN.md`'s Appendix B) supplied a
+few concrete, low-risk rules adopted immediately — `TodayDigest`'s old
+single-item "Now / Next" row became a real multi-item **"Now / Focus"
+zone** (up to 5 items, timed medications/events chronologically plus one
+pinned high-priority task), and Medications/Tasks section headers gained
+quiet **per-category progress badges** ("x/y") — deliberately *not* a
+second gamification system competing with the Ember Chain, which stays
+the sole momentum signal. The report also reinforces (from an IA angle,
+where Appendix A argued it from a glassmorphism/mobile-UX angle) merging
+Life and Tasks into one "Home" tab — that remains an open, undecided
+question, not adopted here; see the plan file's §15 for the reasoning.
+
+A follow-up phase added a **Today / This Week / All** scope control
+(antd `Segmented`) to `TodayDigest` — Schedule/Tasks/Chores/Shopping all
+widen their query range with scope, Tasks' "All" reusing `TasksPage`'s own
+`taskMatchesFilter(t, "all", ...)` predicate verbatim rather than a second
+definition of "all." Medications deliberately stayed today-only regardless
+of scope (a real per-day-grouped week view was out of scope for this pass),
+and the Now/Focus zone + catch-up strip are hidden outside "today" scope —
+both documented as deliberate, not missing. See `LIFE_TAB_FEATURE_PLAN.md`'s
+Phase N for the full record.
