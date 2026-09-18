@@ -924,3 +924,13 @@ Against the production build under `vite preview` with a real service worker
 and the network fully disabled: reload, section switch, and reopening the
 guide with `?` all worked offline — confirming its lazy chunk precaches
 (43 entries, up from 42).
+
+**README**: rewritten for the new UI in the same pass — every screenshot
+re-captured against a seeded demo database (a year of routine history, a
+populated board, medications/chores/inventory/shopping) and stored as
+**`.webp`** instead of `.png`: the scarlet wash is a smooth gradient, which
+PNG compresses badly (~900kB for Month view alone). WebP q88 is visually
+lossless here and the whole 17-image set is 776kB — smaller than the old
+10-image PNG set at higher resolution. A `## 🎨 Design system` section
+documents the token table, the wash, the glass recipe and the motion rules,
+so the palette has one written home outside the two source files.

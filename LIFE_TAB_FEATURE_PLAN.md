@@ -576,9 +576,9 @@ before any change is done" rule.
       tab` entry in the exact style of Phases 1–6 (what shipped, all four
       real bugs found and fixed, verification performed). `README.md`
       gained a Life-tab highlight bullet, two new screenshot rows (Today
-      Digest + Medications, `docs/screenshots/life-today-dark.png` /
-      `life-medications-dark.png`, captured live against the production
-      build), a `What's inside` table entry per Life domain, and its stale
+      Digest + Medications, `docs/screenshots/life-today-dark.*` /
+      `life-medications-dark.*` — captured live against the production
+      build; re-captured as `.webp` in Phase 8), a `What's inside` table entry per Life domain, and its stale
       "18 tests"/Vitest badge counts corrected to 61. **Nothing was
       committed or pushed** — only the working tree changed, per standing
       instruction.
