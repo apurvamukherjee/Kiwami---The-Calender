@@ -30,9 +30,13 @@ installable as a PWA straight from the browser.
 ## ✨ Highlights
 
 - 🔥 **Ember Chain** — the signature streak visual. Not a progress bar, not
-  a ring: a horizontal chain of beads that glows amber when a routine's
+  a ring: a horizontal chain of beads that glows scarlet when a routine's
   done, goes cold ash the day it's missed, and pulses softly on an
   unresolved today. A chain that can catch fire or go cold.
+- 🖤 **"Scarlet Glass" UI** — a macOS-dark surface scale under a live red
+  gradient wash, with translucent blurred panes for every toolbar, sheet,
+  popup and dock, and an Apple-style in-app guide (press `?`) that walks
+  through the whole app.
 - 📅 **Full calendar surface** — Month, Week, Day, and Agenda views, all
   first-class. Drag-to-create, drag-to-move, and drag-to-resize on the
   time grid; a real "+N more" overflow in Month view.

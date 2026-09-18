@@ -47,16 +47,16 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
       className="ember-vignette"
       style={{
         position: "fixed", inset: 0, zIndex: 999,
-        background: "radial-gradient(ellipse at 50% 40%, #1f1408 0%, #131313 55%, #0a0a0a 100%)",
+        background: "radial-gradient(ellipse at 50% 40%, #2a0a0c 0%, #120b0d 52%, #07070a 100%)",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        color: "#f3f1ee", overflow: "hidden",
+        color: "#f2f2f7", overflow: "hidden",
       }}
     >
       {sparks.map((s, i) => (
         <div key={i} className="ember-spark" style={{
           position: "absolute", top: 0, left: s.left,
           width: s.size, height: s.size, borderRadius: "50%",
-          background: "rgba(255, 159, 28, 0.6)",
+          background: "rgba(255, 69, 58, 0.65)",
           animationDuration: `${s.duration}s`, animationDelay: `${s.delay}s`,
         }} />
       ))}
@@ -67,7 +67,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
         transition={{ duration: 3, ease: "easeOut" }}
         style={{
           position: "absolute", width: 420, height: 420, borderRadius: "50%",
-          background: "radial-gradient(circle, #ff9f1c 0%, transparent 65%)",
+          background: "radial-gradient(circle, #ff453a 0%, transparent 65%)",
           filter: "blur(4px)", pointerEvents: "none",
         }}
       />
@@ -86,7 +86,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
             transition={{ duration: 1.4, delay: 0.3, ease: "easeInOut" }}
           />
           <motion.circle
-            cx="46" cy="46" r="42" fill="none" stroke="#ff9f1c" strokeWidth="1.5"
+            cx="46" cy="46" r="42" fill="none" stroke="#ff453a" strokeWidth="1.5"
             strokeLinecap="round" strokeDasharray="4 8"
             initial={{ rotate: 0 }} animate={{ rotate: 360 }}
             transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
@@ -96,19 +96,19 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
           {beads.map((b, i) => (
             <motion.circle
               key={i}
-              cx={b.x} cy={b.y} r="3.2" fill="#ffb86b"
+              cx={b.x} cy={b.y} r="3.2" fill="#ff7a5e"
               initial={{ opacity: 0.12, scale: 0.6 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.5 + i * 0.08, duration: 0.35, ease: "easeOut" }}
-              style={{ filter: "drop-shadow(0 0 3px rgba(255,184,107,0.9))" }}
+              style={{ filter: "drop-shadow(0 0 3px rgba(255,122,94,0.9))" }}
             />
           ))}
           <motion.circle
-            cx="46" cy="46" r="6" fill="#ff9f1c"
+            cx="46" cy="46" r="6" fill="#ff453a"
             initial={{ opacity: 0, scale: 0.4 }}
             animate={{ opacity: [0.7, 1, 0.7], scale: [0.9, 1.15, 0.9] }}
             transition={{ delay: 1.3, duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-            style={{ filter: "drop-shadow(0 0 8px rgba(255,159,28,0.9))" }}
+            style={{ filter: "drop-shadow(0 0 8px rgba(255,69,58,0.9))" }}
           />
         </svg>
       </motion.div>
@@ -125,8 +125,8 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
           style={{
             fontSize: 50, fontWeight: 900, letterSpacing: "0.1em",
             fontFamily: "Inter, system-ui, sans-serif",
-            color: "#f3f1ee",
-            textShadow: glitching ? "none" : "0 2px 30px rgba(255, 159, 28, 0.3)",
+            color: "#f2f2f7",
+            textShadow: glitching ? "none" : "0 2px 30px rgba(255, 69, 58, 0.3)",
           }}
         >KIWAMI</span>
       </motion.div>
@@ -137,9 +137,9 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
       >
         <div className="scan-line" style={{
           position: "absolute", inset: 0,
-          background: "linear-gradient(90deg, transparent 0%, #ff9f1c 50%, transparent 100%)",
+          background: "linear-gradient(90deg, transparent 0%, #ff453a 50%, transparent 100%)",
         }} />
-        <div style={{ position: "absolute", inset: 0, background: "rgba(255, 159, 28, 0.08)" }} />
+        <div style={{ position: "absolute", inset: 0, background: "rgba(255, 69, 58, 0.08)" }} />
       </motion.div>
 
       <motion.div
@@ -147,7 +147,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
         style={{
           fontSize: 11, fontWeight: 600, letterSpacing: "0.5em",
           textTransform: "uppercase", marginTop: 18, opacity: 0.65,
-          color: "#c9b8a3", zIndex: 2, marginLeft: "0.5em",
+          color: "#9b9ba3", zIndex: 2, marginLeft: "0.5em",
         }}
       >
         {"OWN YOUR DAYS".split("").map((ch, i) => (
@@ -166,7 +166,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
         style={{ position: "absolute", bottom: 52, zIndex: 2 }}
       >
         <span className="signature-glow" style={{
-          fontSize: 13, letterSpacing: "0.35em", color: "#ff9f1c", fontWeight: 700,
+          fontSize: 13, letterSpacing: "0.35em", color: "#ff453a", fontWeight: 700,
         }}>
           BY APURVA
         </span>

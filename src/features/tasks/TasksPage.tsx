@@ -5,6 +5,7 @@ import { TbArchive, TbListDetails, TbTags, TbFlame, TbTarget, TbChartBar, TbRepe
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useTokens } from "../../hooks/useTokens";
 import { SectionTabs } from "../../components/SectionTabs";
+import { ChromeActions, type ChromeHandlers } from "../../components/ChromeActions";
 import type { Section } from "../../components/BottomNav";
 import { TaskComposer } from "./TaskComposer";
 import { KanbanBoard } from "./KanbanBoard";
@@ -29,6 +30,7 @@ const SCOPE_OPTIONS = [
 interface Props {
   section: Section;
   onChangeSection: (s: Section) => void;
+  chrome: ChromeHandlers;
   pendingTaskId?: number;
   onConsumePendingTaskId: () => void;
   // Command Palette's "Focus"/"Weekly review" static actions jump here the
@@ -42,7 +44,7 @@ interface Props {
 // Tasks section shell, mirroring NotesPage.tsx/CalendarPage.tsx's structure: sticky
 // toolbar -> pinned TaskComposer -> the Kanban board filling the rest of the viewport.
 export function TasksPage({
-  section, onChangeSection, pendingTaskId, onConsumePendingTaskId, pendingTasksAction, onConsumePendingTasksAction,
+  section, onChangeSection, chrome, pendingTaskId, onConsumePendingTaskId, pendingTasksAction, onConsumePendingTasksAction,
 }: Props) {
   const isMobile = useIsMobile();
   const tokens = useTokens();
@@ -174,16 +176,12 @@ export function TasksPage({
           alignItems: "center",
           gap: 12,
           padding: "10px 16px",
-          borderBottom: "1px solid var(--border)",
           flexWrap: "wrap",
           flexShrink: 0,
-          background: "var(--toolbar-bg)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
           position: "relative",
           zIndex: 10,
         }}
-        className="safe-top"
+        className="safe-top kiwami-toolbar"
       >
         {!isMobile && <SectionTabs section={section} onChange={onChangeSection} />}
         <div style={{ fontSize: 15, fontWeight: 800, flex: 1, minWidth: 100 }}>Tasks</div>
@@ -209,6 +207,7 @@ export function TasksPage({
         <Button type="text" size="small" icon={<TbListDetails size={16} />} onClick={() => setListManagerOpen(true)} aria-label="Manage lists" />
         <Button type="text" size="small" icon={<TbTags size={16} />} onClick={() => setTagManagerOpen(true)} aria-label="Manage tags" />
         <Button type="text" size="small" icon={<TbArchive size={16} />} onClick={() => setArchiveOpen(true)} aria-label="Archive" />
+        <ChromeActions {...chrome} />
       </div>
 
       <TaskComposer lists={lists} tags={tags} textAreaRef={composerRef} />

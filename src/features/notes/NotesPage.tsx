@@ -4,6 +4,7 @@ import { Segmented } from "antd";
 import { TbNotes } from "react-icons/tb";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { SectionTabs } from "../../components/SectionTabs";
+import { ChromeActions, type ChromeHandlers } from "../../components/ChromeActions";
 import type { Section } from "../../components/BottomNav";
 import { NoteComposer } from "./NoteComposer";
 import { NoteListItem } from "./NoteListItem";
@@ -32,6 +33,7 @@ const KIND_FILTER_OPTIONS = [
 interface Props {
   section: Section;
   onChangeSection: (s: Section) => void;
+  chrome: ChromeHandlers;
   // Command Palette note-search jump — same cross-section handoff shape as
   // TasksPage's pendingTaskId (App.tsx's goToNote).
   pendingNoteId?: number;
@@ -48,7 +50,7 @@ interface Props {
 // db.ts's v4 migration), rendered via TaskAgendaRow/TaskDetailSheet instead
 // of NoteListItem/NoteEditorSheet. Notes/Reminders still live in the
 // `notes` table exactly as before.
-export function NotesPage({ section, onChangeSection, pendingNoteId, onConsumePendingNoteId }: Props) {
+export function NotesPage({ section, onChangeSection, chrome, pendingNoteId, onConsumePendingNoteId }: Props) {
   const isMobile = useIsMobile();
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("timeline");
@@ -161,15 +163,14 @@ export function NotesPage({ section, onChangeSection, pendingNoteId, onConsumePe
     <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
       <div style={{
         display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
-        borderBottom: "1px solid var(--border)", flexWrap: "wrap", flexShrink: 0,
-        background: "var(--toolbar-bg)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-        position: "relative", zIndex: 10,
-      }} className="safe-top">
+        flexWrap: "wrap", flexShrink: 0, position: "relative", zIndex: 10,
+      }} className="safe-top kiwami-toolbar">
         {!isMobile && <SectionTabs section={section} onChange={onChangeSection} />}
         <div style={{ fontSize: 15, fontWeight: 800, flex: 1, minWidth: 100 }}>Notes</div>
         <Segmented size="small" value={kindFilter} onChange={(v) => setKindFilter(v as KindFilter)} options={KIND_FILTER_OPTIONS} />
         <Segmented size="small" value={viewMode} onChange={(v) => setViewMode(v as ViewMode)}
           options={[{ label: "Timeline", value: "timeline" }, { label: "All", value: "all" }]} />
+        <ChromeActions {...chrome} />
       </div>
 
       <NoteComposer />

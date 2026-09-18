@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import dayjs from "dayjs";
 import { Button, Segmented, DatePicker } from "antd";
-import { TbChevronLeft, TbChevronRight, TbPlus, TbSettings, TbActivity, TbSearch } from "react-icons/tb";
+import { TbChevronLeft, TbChevronRight, TbPlus, TbActivity } from "react-icons/tb";
 import { useIsMobile } from "../../hooks/useIsMobile";
-import { SettingsSheet } from "../../components/SettingsSheet";
 import { SectionTabs } from "../../components/SectionTabs";
+import { ChromeActions, type ChromeHandlers } from "../../components/ChromeActions";
 import type { Section } from "../../components/BottomNav";
 import { useNotesForRange } from "../../lib/notes";
 import { NoteEditorSheet } from "../notes/NoteEditorSheet";
@@ -57,7 +57,7 @@ export interface CalendarNavRequest {
 interface Props {
   section: Section;
   onChangeSection: (s: Section) => void;
-  onOpenPalette: () => void;
+  chrome: ChromeHandlers;
   pendingNav?: CalendarNavRequest | null;
   onConsumePendingNav: () => void;
 }
@@ -65,7 +65,7 @@ interface Props {
 // Full-width desktop calendar shell (toolbar + active view filling the rest
 // of the viewport) that collapses to Day+Agenda only below the mobile
 // breakpoint — not a phone card scaled up, a real responsive app shell.
-export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingNav, onConsumePendingNav }: Props) {
+export function CalendarPage({ section, onChangeSection, chrome, pendingNav, onConsumePendingNav }: Props) {
   const isMobile = useIsMobile();
   const [view, setView] = useState<CalendarView>("month");
   const [currentDate, setCurrentDate] = useState(todayKey());
@@ -79,7 +79,6 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CalendarItem | null>(null);
   const [createDefaults, setCreateDefaults] = useState<{ date?: string; time?: string; endTime?: string }>({});
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [routineSheetOpen, setRoutineSheetOpen] = useState(false);
   const [routineItem, setRoutineItem] = useState<CalendarItem | null>(null);
   const [foodSheetOpen, setFoodSheetOpen] = useState(false);
@@ -95,7 +94,7 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
     if (isMobile && (view === "month" || view === "week")) setView("day");
   }, [isMobile, view]);
 
-  const anySheetOpen = editorOpen || routineSheetOpen || foodSheetOpen || settingsOpen || noteEditorOpen || noteFullEditorOpen || taskDetailOpen;
+  const anySheetOpen = editorOpen || routineSheetOpen || foodSheetOpen || noteEditorOpen || noteFullEditorOpen || taskDetailOpen;
 
   // Arrow-key date nav + "T" for Today — skipped while typing anywhere or
   // while a sheet is open, so it never fights with form inputs.
@@ -187,10 +186,8 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
     <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
       <div style={{
         display: "flex", alignItems: "center", gap: isMobile ? 8 : 12, padding: isMobile ? "10px 12px" : "10px 16px",
-        borderBottom: "1px solid var(--border)", flexWrap: "wrap", flexShrink: 0,
-        background: "var(--toolbar-bg)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-        position: "relative", zIndex: 10,
-      }} className="safe-top">
+        flexWrap: "wrap", flexShrink: 0, position: "relative", zIndex: 10,
+      }} className="safe-top kiwami-toolbar">
         {!isMobile && <SectionTabs section={section} onChange={onChangeSection} />}
         {view !== "today" && (
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -204,7 +201,7 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
               allowClear={false}
               inputReadOnly
               format="D MMM 'YY"
-              style={{ width: 100 }}
+              style={{ width: 112 }}
               aria-label="Jump to date"
               classNames={{ popup: { root: "kiwami-date-dropdown" } }}
             />
@@ -224,9 +221,8 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
           <Button type="primary" icon={<TbPlus size={15} />} onClick={() => openCreate()} aria-label="New event">
             {isMobile ? null : "New"}
           </Button>
-          <Button type="text" icon={<TbSearch size={16} />} onClick={onOpenPalette} aria-label="Search (Ctrl+K)" />
-          <Button type="text" icon={<TbActivity size={17} />} onClick={() => setYearHeatmapOpen(true)} aria-label="Year in review" />
-          <Button type="text" icon={<TbSettings size={17} />} onClick={() => setSettingsOpen(true)} aria-label="Settings" />
+          <Button type="text" size="small" icon={<TbActivity size={16} />} onClick={() => setYearHeatmapOpen(true)} aria-label="Year in review" />
+          <ChromeActions {...chrome} />
         </div>
       </div>
 
@@ -271,7 +267,6 @@ export function CalendarPage({ section, onChangeSection, onOpenPalette, pendingN
         item={foodItem}
         onEdit={(it) => { setEditingItem(it); setEditorOpen(true); }}
       />
-      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <YearHeatmapSheet open={yearHeatmapOpen} onClose={() => setYearHeatmapOpen(false)} />
       <NoteEditorSheet open={noteEditorOpen} onClose={() => setNoteEditorOpen(false)} note={editingNote} />
       {noteFullEditorOpen && (

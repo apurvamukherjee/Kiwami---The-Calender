@@ -5,7 +5,7 @@ import { Modal, Input, Empty } from "antd";
 import dayjs from "dayjs";
 import {
   TbSearch, TbCalendarEvent, TbFlame, TbToolsKitchen2, TbCalendarCheck, TbFlag, TbTarget, TbChartBar, TbNote, TbBell,
-  TbPill, TbChecklist, TbBox, TbHeart, TbShoppingCart, TbLayoutDashboard,
+  TbPill, TbChecklist, TbBox, TbHeart, TbShoppingCart, TbLayoutDashboard, TbHelpCircle,
 } from "react-icons/tb";
 import { useSearchEvents } from "../features/calendar/useSearchEvents";
 import { useSearchTasks } from "../features/tasks/useSearchTasks";
@@ -33,6 +33,7 @@ interface Props {
   onGoToFocus: () => void;
   onGoToWeeklyReview: () => void;
   onGoToLife: (view: LifeView) => void;
+  onOpenGuide: () => void;
 }
 
 // One flat row per result, built by concatenating every producer (static
@@ -52,7 +53,7 @@ interface Row {
 // useSearchEvents.ts. A floating top-anchored overlay (not the app's usual
 // bottom-sheet-on-mobile Sheet) since a command palette should feel like a
 // keyboard-first spotlight on every device.
-export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToTask, onGoToNote, onGoToFocus, onGoToWeeklyReview, onGoToLife }: Props) {
+export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToTask, onGoToNote, onGoToFocus, onGoToWeeklyReview, onGoToLife, onOpenGuide }: Props) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const eventResults = useSearchEvents(query);
@@ -91,6 +92,9 @@ export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToT
     }
     if (!q || "add to buy list".includes(q) || "buy list".includes(q) || "shopping".includes(q)) {
       list.push({ key: "action-buy", icon: <TbShoppingCart size={14} style={{ color: "var(--gold)" }} />, primary: "Add to buy list", run: () => onGoToLife("shopping") });
+    }
+    if (!q || "guide".includes(q) || "help".includes(q) || "how to use".includes(q) || "shortcuts".includes(q)) {
+      list.push({ key: "action-guide", icon: <TbHelpCircle size={14} style={{ color: "var(--accent)" }} />, primary: "How to use Kiwami", secondary: "?", run: onOpenGuide });
     }
 
     for (const r of eventResults) {
@@ -139,7 +143,7 @@ export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToT
     }
 
     return list;
-  }, [query, eventResults, taskResults, noteResults, lifeResults, tokens, onGoToToday, onGoToFocus, onGoToWeeklyReview, onGoToDate, onGoToTask, onGoToNote, onGoToLife]);
+  }, [query, eventResults, taskResults, noteResults, lifeResults, tokens, onGoToToday, onGoToFocus, onGoToWeeklyReview, onGoToDate, onGoToTask, onGoToNote, onGoToLife, onOpenGuide]);
 
   function runIndex(i: number) {
     const row = rows[i];
@@ -164,11 +168,7 @@ export function CommandPalette({ open, onClose, onGoToDate, onGoToToday, onGoToT
       style={{ top: 96 }}
       styles={{
         body: { padding: 0 },
-        content: {
-          background: `${tokens.surfaceLowest}e6`,
-          backdropFilter: "blur(20px)",
-          border: "1px solid transparent",
-        },
+        content: { border: "1px solid transparent" },
       }}
       className="kiwami-blade"
       // antd's Modal grabs focus back onto its own wrapper right after

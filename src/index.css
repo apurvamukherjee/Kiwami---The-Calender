@@ -7,62 +7,81 @@
 @import "@fontsource/jetbrains-mono/latin-500.css";
 @import "@fontsource/jetbrains-mono/latin-700.css";
 
+/* =======================================================================
+   "SCARLET GLASS" — macOS-dark design tokens.
+   Surfaces are Apple's graphite window scale (near-black, never pure #000);
+   the accent is systemRed pushed hot, and every panel is a translucent pane
+   floating over a fixed scarlet gradient wash painted on <body> (below).
+   Light mode is the same system inverted onto Apple's #f5f5f7 desktop grey.
+   ======================================================================= */
 :root {
-  --bg: #f7f5f2;
+  --bg: #f5f5f7;
   --surface: #ffffff;
-  --ink: #1c1a17;
-  --ink-soft: #6b655e;
-  --accent: #d9631a;
-  --ember-hot: #ff8a3d;
-  --ash: #c9c2ba;
-  --gold: #b8860b;
-  --teal: #12b3a1;
-  --diamond: #1f8fa8;
-  --danger: #c8112a;
-  --border: #e8e2da;
-  --ember-glow: rgba(217, 99, 26, 0.35);
+  --surface-high: #ffffff;
+  --surface-highest: #ebebef;
+  --surface-lowest: #ffffff;
+  --ink: #1d1d1f;
+  --ink-soft: #6e6e73;
+  --accent: #ff3b30;
+  --accent-deep: #c9182b;
+  --ember-hot: #ff6b4a;
+  --ash: #d2d2d7;
+  --gold: #c79300;
+  --teal: #0f83b3;
+  --diamond: #a4133c;
+  --danger: #d70015;
+  --border: rgba(0, 0, 0, 0.10);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --ember-glow: rgba(255, 59, 48, 0.30);
+  --accent-gradient: linear-gradient(135deg, #ff6b4a 0%, #ff3b30 52%, #d81e5b 100%);
   --font-display: "Playfair Display", serif;
-  --font-mono: "JetBrains Mono", monospace;
-  --toolbar-bg: rgba(255, 255, 255, 0.82);
-  --glass-bg: rgba(255, 255, 255, 0.65);
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --toolbar-bg: rgba(255, 255, 255, 0.68);
+  --glass-bg: rgba(255, 255, 255, 0.62);
   --glass-border: rgba(0, 0, 0, 0.08);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.10);
-  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --glass-shadow: 0 10px 34px rgba(60, 10, 10, 0.12);
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  /* The ambient wash. Three scarlet blooms + a top light-leak, deliberately
+     strong enough to read as a tint rather than a smudge. */
+  --wash-1: rgba(255, 59, 48, 0.16);
+  --wash-2: rgba(216, 30, 91, 0.13);
+  --wash-3: rgba(255, 107, 74, 0.14);
+  --wash-leak: rgba(255, 90, 70, 0.18);
 }
 
-/* Dark is the default (data-theme is set on <html> before hydration —
-   see index.html's inline script) — "Ember & Ash": obsidian surfaces as a
-   canvas for the ember/teal/diamond accents to visibly burn against.
-   Token values extracted from the Stitch-generated "Ember & Ash" design
-   system (see CLAUDE.md for provenance). */
+/* Dark is the default (data-theme is set on <html> before hydration — see
+   index.html's inline script). */
 [data-theme="dark"] {
-  --bg: #131313;
-  --surface: #1c1b1b;
-  --ink: #e5e2e1;
-  --ink-soft: #dac2ae;
-  --accent: #ff9f1c;
-  --ember-hot: #ffb86b;
-  --ash: #353535;
-  --gold: #f6b93b;
-  --teal: #4fdbcc;
-  --diamond: #90dceb;
-  --danger: #ffb4ab;
-  --border: #544434;
-  --ember-glow: rgba(255, 159, 28, 0.4);
-  --surface-lowest: #0e0e0e;
-  --surface-high: #2a2a2a;
-  --surface-highest: #353535;
-  --toolbar-bg: rgba(19, 19, 19, 0.82);
-  --glass-bg: rgba(20, 20, 20, 0.55);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+  --bg: #0b0b0e;
+  --surface: #151519;
+  --surface-high: #1b1b20;
+  --surface-highest: #232329;
+  --surface-lowest: #0b0b0e;
+  --ink: #f2f2f7;
+  --ink-soft: #9b9ba3;
+  --accent: #ff453a;
+  --accent-deep: #b3121f;
+  --ember-hot: #ff7a5e;
+  --ash: #3a3a3f;
+  --gold: #ffd60a;
+  --teal: #64d2ff;
+  --diamond: #ffd7e0;
+  --danger: #ff375f;
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --ember-glow: rgba(255, 69, 58, 0.45);
+  --accent-gradient: linear-gradient(135deg, #ff7a5e 0%, #ff453a 52%, #ff2d55 100%);
+  --toolbar-bg: rgba(16, 16, 19, 0.62);
+  --glass-bg: rgba(26, 26, 31, 0.58);
+  --glass-border: rgba(255, 255, 255, 0.11);
+  --glass-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
   --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  --wash-1: rgba(255, 69, 58, 0.22);
+  --wash-2: rgba(255, 45, 85, 0.16);
+  --wash-3: rgba(179, 18, 31, 0.24);
+  --wash-leak: rgba(255, 90, 70, 0.14);
 }
 
-/* Native <input type="date"> fields (EventEditorSheet, NoteComposer) theme
-   their text via the --ink/--bg vars above, but the browser-drawn calendar-
-   picker-indicator glyph ignores CSS color entirely — without this it stays
-   a dark icon on the now-dark field background and nearly disappears. */
 [data-theme="dark"] input[type="date"] { color-scheme: dark; }
 
 * { box-sizing: border-box; }
@@ -72,10 +91,46 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* The scarlet wash. A fixed, pointer-transparent layer painted UNDER the app
+   (#root is raised to z-index 1) so every translucent panel above it blurs
+   real color instead of flat grey. Two layers: a static multi-bloom base and
+   a slowly drifting light-leak, so the tint breathes without ever animating
+   an expensive gradient repaint (the drift is a transform, not a
+   background-position). */
+#root { position: relative; z-index: 1; height: 100%; }
+body::before, body::after {
+  content: "";
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+}
+body::before {
+  inset: 0;
+  background:
+    radial-gradient(70vw 60vh at 8% -10%, var(--wash-1), transparent 62%),
+    radial-gradient(60vw 55vh at 100% 4%, var(--wash-2), transparent 60%),
+    radial-gradient(80vw 65vh at 50% 112%, var(--wash-3), transparent 64%);
+}
+body::after {
+  top: -35vh;
+  left: -20vw;
+  width: 140vw;
+  height: 90vh;
+  background: radial-gradient(closest-side, var(--wash-leak), transparent 70%);
+  filter: blur(40px);
+  animation: wash-drift 26s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes wash-drift {
+  0%   { transform: translate3d(-6%, 0, 0) scale(1); }
+  100% { transform: translate3d(10%, 8vh, 0) scale(1.18); }
 }
 
 /* Smooth dark/light switch: animate color-family properties on theme change
@@ -148,16 +203,16 @@ input, textarea, [contenteditable="true"], .selectable {
   position: absolute; inset: 0; pointer-events: none;
   mix-blend-mode: screen;
 }
-.glitch::before { color: #ff9f1c; text-shadow: 2px 0 #ff9f1c; }
-.glitch::after  { color: #90dceb; text-shadow: -2px 0 #90dceb; }
+.glitch::before { color: #ff453a; text-shadow: 2px 0 #ff453a; }
+.glitch::after  { color: #4fd8ff; text-shadow: -2px 0 #4fd8ff; }
 .glitch.glitch-active { animation: glitch-jitter 180ms steps(5) infinite; }
 .glitch.glitch-active::before { animation: glitch-jitter 200ms steps(5) infinite, glitch-clip 200ms steps(5) infinite; }
 .glitch.glitch-active::after  { animation: glitch-jitter 160ms steps(5) reverse infinite, glitch-clip 220ms steps(5) reverse infinite; }
 
 /* Breathing amber glow — the "by Apurva" signature. */
 @keyframes signature-breathe {
-  0%, 100% { text-shadow: 0 0 6px rgba(255, 159, 28, 0.4), 0 0 12px rgba(255, 159, 28, 0.2); opacity: 0.85; }
-  50% { text-shadow: 0 0 12px rgba(255, 159, 28, 0.85), 0 0 24px rgba(255, 159, 28, 0.4); opacity: 1; }
+  0%, 100% { text-shadow: 0 0 6px rgba(255, 69, 58, 0.4), 0 0 12px rgba(255, 69, 58, 0.2); opacity: 0.85; }
+  50% { text-shadow: 0 0 12px rgba(255, 69, 58, 0.85), 0 0 24px rgba(255, 69, 58, 0.4); opacity: 1; }
 }
 .signature-glow { animation: signature-breathe 2.4s ease-in-out infinite; }
 
@@ -210,10 +265,22 @@ input, textarea, [contenteditable="true"], .selectable {
   border-radius: 18px;
   box-shadow: var(--glass-shadow), var(--glass-rim);
 }
+/* Heavier pane for hero/modal surfaces that float over dense content. */
+.glass-strong {
+  position: relative;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: var(--glass-shadow), var(--glass-rim);
+}
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
   .glass {
     -webkit-backdrop-filter: blur(14px) saturate(180%);
     backdrop-filter: blur(14px) saturate(180%);
+  }
+  .glass-strong {
+    -webkit-backdrop-filter: blur(30px) saturate(190%);
+    backdrop-filter: blur(30px) saturate(190%);
   }
 }
 
@@ -268,3 +335,204 @@ input, textarea, [contenteditable="true"], .selectable {
 .kiwami-editor-body ul[data-type="taskList"] li > label { flex-shrink: 0; margin-top: 3px; }
 .kiwami-editor-body ul[data-type="taskList"] li > div { flex: 1; min-width: 0; }
 .kiwami-editor-body ul[data-type="taskList"] li[data-checked="true"] > div { text-decoration: line-through; opacity: 0.55; }
+
+/* =======================================================================
+   MACOS CHROME — the app-wide translucency/motion layer.
+
+   Written as global antd overrides rather than per-component style props on
+   purpose: ~60 components already render antd Modals/Buttons/Segmenteds, and
+   restyling them one file at a time would be 60 diffs that drift apart. One
+   stylesheet keeps the whole surface consistent.
+
+   `!important` is used deliberately here — antd v5 injects its own rules into
+   <head> at runtime, so cascade order against this stylesheet isn't
+   guaranteed and specificity alone can't win reliably.
+   ======================================================================= */
+
+/* The single easing curve everything uses — Apple's standard ease-out. */
+:root { --ease: cubic-bezier(0.32, 0.72, 0, 1); --ease-soft: cubic-bezier(0.22, 1, 0.36, 1); }
+
+::selection { background: var(--ember-glow); color: var(--ink); }
+
+/* Overlay scrim: macOS dims + blurs what's behind a sheet rather than
+   dropping a flat black veil over it. */
+.ant-modal-mask,
+.ant-drawer-mask {
+  background: rgba(0, 0, 0, 0.42) !important;
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .ant-modal-mask, .ant-drawer-mask {
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+}
+
+/* Every sheet/dialog is a floating glass pane. */
+.ant-modal-content {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-rim) !important;
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .ant-modal-content {
+    -webkit-backdrop-filter: blur(30px) saturate(190%);
+    backdrop-filter: blur(30px) saturate(190%);
+  }
+}
+.ant-modal-header { background: transparent !important; }
+.ant-modal-title { font-weight: 700 !important; letter-spacing: -0.01em; }
+/* Traffic-light-adjacent close button: a soft circular hit target. */
+.ant-modal-close { border-radius: 999px !important; }
+
+/* Popups (date picker, selects, dropdowns, popovers) get the same pane. */
+.ant-picker-dropdown .ant-picker-panel-container,
+.ant-select-dropdown,
+.ant-dropdown-menu,
+.ant-popover-inner,
+.ant-notification-notice,
+.ant-message-notice-content {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-rim) !important;
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .ant-picker-dropdown .ant-picker-panel-container,
+  .ant-select-dropdown,
+  .ant-dropdown-menu,
+  .ant-popover-inner,
+  .ant-notification-notice,
+  .ant-message-notice-content {
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+}
+
+/* Buttons — scarlet gradient fill with a live glow, plus the small
+   lift-on-hover / press-in feedback macOS controls have. */
+.ant-btn {
+  transition: transform 0.16s var(--ease), box-shadow 0.22s var(--ease),
+    background-color 0.22s var(--ease), border-color 0.22s var(--ease) !important;
+}
+.ant-btn:active { transform: scale(0.97); }
+.ant-btn-primary {
+  background: var(--accent-gradient) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: 0 2px 10px var(--ember-glow), var(--glass-rim) !important;
+}
+.ant-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px var(--ember-glow), var(--glass-rim) !important;
+  filter: saturate(115%);
+}
+.ant-btn-default {
+  background: var(--glass-bg) !important;
+  border-color: var(--border-strong) !important;
+}
+.ant-btn-default:hover:not(:disabled) { transform: translateY(-1px); }
+.ant-btn-text:hover:not(:disabled) { background: var(--border) !important; }
+
+/* Segmented (the view switcher and every sub-nav) as a macOS pill: recessed
+   translucent track, gradient thumb that slides. */
+.ant-segmented {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border);
+  padding: 3px !important;
+  border-radius: 12px !important;
+}
+.ant-segmented .ant-segmented-item-selected,
+.ant-segmented .ant-segmented-thumb {
+  background: var(--accent-gradient) !important;
+  box-shadow: 0 2px 10px var(--ember-glow) !important;
+  border-radius: 9px !important;
+}
+.ant-segmented .ant-segmented-item-selected .ant-segmented-item-label,
+.ant-segmented .ant-segmented-item-selected { color: #fff !important; }
+.ant-segmented .ant-segmented-item-label { font-weight: 600; transition: color 0.2s var(--ease); }
+
+/* Inputs: recessed rather than raised, with a scarlet focus ring. */
+.ant-input, .ant-input-affix-wrapper, .ant-picker, .ant-select-selector,
+input[type="date"], input[type="time"], select, textarea {
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease) !important;
+}
+.ant-input:focus, .ant-input-focused,
+.ant-input-affix-wrapper-focused,
+.ant-picker-focused,
+.ant-select-focused .ant-select-selector {
+  box-shadow: 0 0 0 3px var(--ember-glow) !important;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible,
+button:focus-visible, [tabindex]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ember-glow);
+  border-radius: 8px;
+}
+
+/* Switch / checkbox / radio adopt the accent gradient. */
+.ant-switch.ant-switch-checked { background: var(--accent-gradient) !important; }
+.ant-checkbox-checked .ant-checkbox-inner { background: var(--accent) !important; border-color: var(--accent) !important; }
+
+/* Today's date cell + selected day in the jump-to-date picker. */
+.ant-picker-cell-selected .ant-picker-cell-inner { background: var(--accent-gradient) !important; }
+
+/* macOS overlay scrollbars: invisible until the surface is hovered. */
+* { scrollbar-width: thin; scrollbar-color: var(--ash) transparent; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--ash);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); background-clip: content-box; }
+
+/* Shared interaction affordance for the app's own (non-antd) tappable rows
+   and cards — one class instead of per-component hover handlers. */
+.kiwami-pressable {
+  transition: transform 0.16s var(--ease), background-color 0.2s var(--ease), box-shadow 0.22s var(--ease);
+}
+.kiwami-pressable:hover { transform: translateY(-1px); }
+.kiwami-pressable:active { transform: scale(0.985); }
+
+/* Mobile tab dock — a floating glass bar, iOS-style, with the active tab
+   marked by a gradient pill (animated via framer-motion's layoutId). */
+.kiwami-dock {
+  background: var(--toolbar-bg);
+  border-top: 1px solid var(--glass-border);
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .kiwami-dock {
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+}
+
+/* App chrome (toolbars) — same recipe as the dock, applied by class so a
+   page's toolbar only needs `className="kiwami-toolbar"`. */
+.kiwami-toolbar {
+  background: var(--toolbar-bg) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .kiwami-toolbar {
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+}
+
+/* Section cross-fade (App.tsx wraps the active section in motion.div). */
+@keyframes kiwami-section-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.995); }
+  to { opacity: 1; transform: none; }
+}
+
+/* One global opt-out. Anything decorative above must die here. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .ant-btn:active, .ant-btn-primary:hover, .kiwami-pressable:hover, .kiwami-pressable:active { transform: none !important; }
+}

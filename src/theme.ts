@@ -1,15 +1,24 @@
 import { theme as antdTheme, type ThemeConfig } from "antd";
 
+// macOS-flavoured geometry: Apple's stock controls sit at ~10–12px radius and
+// a 28–36px control height; antd's defaults are squarer and shorter.
 const shared = {
   borderRadius: 12,
-  fontFamily: "Inter, system-ui, sans-serif",
+  borderRadiusSM: 8,
+  borderRadiusLG: 16,
+  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif',
   fontSizeHeading2: 24,
-  controlHeight: 40,
+  controlHeight: 38,
+  lineWidth: 1,
+  wireframe: false,
 };
 const components = {
-  Card: { borderRadiusLG: 16, paddingLG: 16 },
-  Button: { fontWeight: 600, borderRadius: 10, controlHeight: 42 },
+  Card: { borderRadiusLG: 18, paddingLG: 16 },
+  Button: { fontWeight: 600, borderRadius: 10, controlHeight: 38, primaryShadow: "none", defaultShadow: "none" },
   Segmented: { borderRadius: 10 },
+  Modal: { borderRadiusLG: 18 },
+  Input: { borderRadius: 10 },
+  Select: { borderRadius: 10 },
 };
 
 export type Mode = "light" | "dark";
@@ -28,16 +37,19 @@ export function getTheme(mode: Mode): ThemeConfig {
       algorithm: antdTheme.darkAlgorithm,
       token: {
         ...shared,
-        colorPrimary: "#ff9f1c",
-        colorInfo: "#ff9f1c",
-        colorSuccess: "#4fdbcc",
-        colorWarning: "#f6b93b",
-        colorError: "#ffb4ab",
-        colorBgLayout: "#131313",
-        colorBgContainer: "#1c1b1b",
-        colorBgElevated: "#20201f",
-        colorBorderSecondary: "#544434",
-        colorTextHeading: "#e5e2e1",
+        colorPrimary: "#ff453a",
+        colorInfo: "#ff453a",
+        colorSuccess: "#30d158",
+        colorWarning: "#ffd60a",
+        colorError: "#ff375f",
+        colorBgLayout: "#0b0b0e",
+        colorBgContainer: "#151519",
+        colorBgElevated: "#1b1b20",
+        colorBorder: "rgba(255,255,255,0.14)",
+        colorBorderSecondary: "rgba(255,255,255,0.08)",
+        colorText: "#f2f2f7",
+        colorTextSecondary: "#a1a1aa",
+        colorTextHeading: "#ffffff",
       },
       components,
     };
@@ -46,13 +58,17 @@ export function getTheme(mode: Mode): ThemeConfig {
     ...base,
     token: {
       ...shared,
-      colorPrimary: "#d9631a",
-      colorInfo: "#d9631a",
-      colorSuccess: "#12b3a1",
-      colorWarning: "#b8860b",
-      colorError: "#c8112a",
-      colorBgLayout: "#f7f5f2",
-      colorTextHeading: "#1c1a17",
+      colorPrimary: "#ff3b30",
+      colorInfo: "#ff3b30",
+      colorSuccess: "#1c9e4b",
+      colorWarning: "#c79300",
+      colorError: "#d70015",
+      colorBgLayout: "#f5f5f7",
+      colorBgContainer: "#ffffff",
+      colorBorder: "rgba(0,0,0,0.14)",
+      colorBorderSecondary: "rgba(0,0,0,0.08)",
+      colorText: "#1d1d1f",
+      colorTextHeading: "#000000",
     },
     components,
   };
@@ -63,11 +79,12 @@ export const EMBER = "var(--accent)";
 export const ASH = "var(--ash)";
 
 // Concrete hexes for contexts where CSS vars can't resolve (box-shadow glow
-// intensities, canvas/SVG attrs). Keep in sync with index.css by hand.
-// `diamond` ("Forge Diamond") is reserved exclusively for streak-milestone
+// intensities, canvas/SVG attrs, `${hex}20` alpha concatenation). Keep in
+// sync with index.css by hand.
+// `diamond` ("Forged Diamond") is reserved exclusively for streak-milestone
 // beads — never reused as a general accent, so a milestone reads as
-// unambiguously rare against the ember palette used everywhere else.
+// unambiguously rare against the scarlet palette used everywhere else.
 export const TOKENS = {
-  light: { accent: "#d9631a", emberHot: "#ff8a3d", ash: "#c9c2ba", gold: "#b8860b", teal: "#12b3a1", diamond: "#1f8fa8", danger: "#c8112a", surfaceLowest: "#ffffff" },
-  dark: { accent: "#ff9f1c", emberHot: "#ffb86b", ash: "#353535", gold: "#f6b93b", teal: "#4fdbcc", diamond: "#90dceb", danger: "#ffb4ab", surfaceLowest: "#0e0e0e" },
+  light: { accent: "#ff3b30", emberHot: "#ff6b4a", ash: "#d2d2d7", gold: "#c79300", teal: "#0f83b3", diamond: "#a4133c", danger: "#d70015", surfaceLowest: "#ffffff" },
+  dark: { accent: "#ff453a", emberHot: "#ff7a5e", ash: "#3a3a3f", gold: "#ffd60a", teal: "#64d2ff", diamond: "#ffd7e0", danger: "#ff375f", surfaceLowest: "#0b0b0e" },
 };

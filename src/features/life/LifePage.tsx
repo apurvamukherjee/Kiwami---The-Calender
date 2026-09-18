@@ -3,6 +3,7 @@ import { Segmented } from "antd";
 import { TbSun, TbPill, TbChecklist, TbBox, TbShoppingBag } from "react-icons/tb";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { SectionTabs } from "../../components/SectionTabs";
+import { ChromeActions, type ChromeHandlers } from "../../components/ChromeActions";
 import type { Section } from "../../components/BottomNav";
 import { TodayDigest } from "./TodayDigest";
 import { MedicationsView } from "./MedicationsView";
@@ -15,6 +16,7 @@ export type LifeView = "today" | "medications" | "chores" | "inventory" | "shopp
 interface Props {
   section: Section;
   onChangeSection: (s: Section) => void;
+  chrome: ChromeHandlers;
   onGoToDate: (date: string) => void;
   onGoToTask: (taskId: number) => void;
   // Command Palette deep-links here — jump straight to the right sub-view,
@@ -36,7 +38,7 @@ const VIEW_OPTIONS = [
 // a second-level Segmented switching between Today/Medications/Chores/
 // Inventory/Shopping -> the active sub-view filling the rest of the
 // viewport. See LIFE_TAB_FEATURE_PLAN.md for the full design.
-export function LifePage({ section, onChangeSection, onGoToDate, onGoToTask, pendingView, onConsumePendingView }: Props) {
+export function LifePage({ section, onChangeSection, chrome, onGoToDate, onGoToTask, pendingView, onConsumePendingView }: Props) {
   const isMobile = useIsMobile();
   const [view, setView] = useState<LifeView>("today");
 
@@ -51,14 +53,13 @@ export function LifePage({ section, onChangeSection, onGoToDate, onGoToTask, pen
       <div
         style={{
           display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
-          borderBottom: "1px solid var(--border)", flexWrap: "wrap", flexShrink: 0,
-          background: "var(--toolbar-bg)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-          position: "relative", zIndex: 10,
+          flexWrap: "wrap", flexShrink: 0, position: "relative", zIndex: 10,
         }}
-        className="safe-top"
+        className="safe-top kiwami-toolbar"
       >
         {!isMobile && <SectionTabs section={section} onChange={onChangeSection} />}
         <div style={{ fontSize: 15, fontWeight: 800, flex: 1, minWidth: 100 }}>Life</div>
+        <ChromeActions {...chrome} />
       </div>
 
       <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>

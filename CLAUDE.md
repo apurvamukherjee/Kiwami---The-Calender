@@ -829,3 +829,98 @@ of scope (a real per-day-grouped week view was out of scope for this pass),
 and the Now/Focus zone + catch-up strip are hidden outside "today" scope —
 both documented as deliberate, not missing. See `LIFE_TAB_FEATURE_PLAN.md`'s
 Phase N for the full record.
+
+## Phase 8 — "Scarlet Glass": macOS-dark revamp + in-app guide (2026-09-19)
+
+A full visual re-theme (replacing Phase 3's "Ember & Ash" amber/obsidian
+system), app-wide glassmorphism, motion polish, an Apple-style onboarding
+guide, and one real navigation fix. Requested as: macOS dark theme with an
+aggressive red gradient tint, proper glass, smooth animations, "a proper
+guide like Apple", and navigation that makes it usable daily.
+
+**The whole re-theme is a token-layer change.** Before touching anything, a
+`grep` for hardcoded hexes confirmed the entire palette lives in exactly four
+files (`theme.ts`, `index.css`, `SplashScreen.tsx`, `index.html`) — every
+other component already reads `var(--accent)` / `useTokens()`. So the palette
+swap is those four files, and ~60 feature components inherited it for free.
+**Keep it that way**: a new hardcoded hex anywhere else re-breaks this.
+
+**Palette** (`theme.ts` `TOKENS` + `index.css` vars, kept in sync by hand as
+before): Apple's graphite window scale (`#0b0b0e` base, `#151519`/`#1b1b20`/
+`#232329` elevations — near-black, never pure `#000`), systemRed pushed hot
+(`--accent: #ff453a`, `--ember-hot: #ff7a5e`, `--accent-deep: #b3121f`),
+alpha-white borders (`rgba(255,255,255,0.10)`), `--teal: #64d2ff` (food,
+unchanged role), `--gold: #ffd60a`, `--danger: #ff375f` (systemPink — kept
+distinct from the now-red accent so destructive actions still read as their
+own thing), and `--diamond: #ffd7e0` (a pale rose, still reserved
+*exclusively* for streak-milestone beads). Light mode is the same system on
+Apple's `#f5f5f7` desktop grey. New: `--accent-gradient`, the scarlet
+gradient used for every primary button, Segmented thumb, dock pill and the
+guide's glyph tile.
+
+**The wash** — `body::before` (three fixed radial scarlet blooms) plus
+`body::after` (one blurred light-leak drifting on a 26s `transform`
+animation, never an animated `background-position`). `#root` is raised to
+`z-index: 1` so the wash sits under the whole app and every translucent pane
+blurs real color instead of flat grey. This is what makes the glass read as
+glass.
+
+**Glass is a global antd override layer**, not per-component style props
+(`index.css`'s "MACOS CHROME" section): modal content, the mask (dim +
+blur, macOS-style), date-picker/select/dropdown/popover/notification
+panels, Segmented tracks, default buttons. `!important` throughout — antd v5
+injects its rules into `<head>` at runtime, so cascade order against this
+stylesheet isn't guaranteed and specificity alone can't win. Doing it
+per-component would have been ~60 diffs that drift apart. Two reusable
+classes fell out: `.kiwami-toolbar` (every page's toolbar; replaced four
+copies of the same inline `background`+`backdropFilter` triple) and
+`.glass-strong` (30px blur, for hero panes).
+
+**Motion**: one shared easing var (`--ease`, Apple's standard ease-out),
+hover-lift/press-scale on buttons, a scarlet focus ring on every input and
+`:focus-visible` target, macOS overlay scrollbars, `BottomNav`'s active tab
+as a single gradient pill shared across all four buttons via framer-motion's
+`layoutId` (one element slides instead of four cross-fading), and an
+enter-only fade on section switches. Everything decorative is killed by one
+global `prefers-reduced-motion` block.
+
+**`components/GuideSheet.tsx`** — six-page Apple-onboarding-style overlay
+(gradient glyph tile, title, four icon+title+body rows, page dots,
+Continue/Skip). Auto-opens once on first run (`localStorage`
+`kiwami-guide-seen`), **gated on the splash finishing** (`ready`) since its
+z-index is above the splash. Reachable afterwards from the `?` key, every
+toolbar's `?` button, Settings, and a Command Palette action. Lazy-loaded,
+so it's not in a returning user's first chunk. Its copy is deliberately
+written against what the app actually *does*, including the honest limits
+already documented here (reminders are foreground-only; everything is
+device-local) — a guide that promises absent behavior is worse than none.
+It uses the same **local `ready`-state guard as `NoteFullEditor`** for
+`useBackClose` — see Phase 5; do not "simplify" that away.
+
+**Navigation fix**: `SettingsSheet` was mounted only inside `CalendarPage`,
+so Settings was literally unreachable from Notes/Tasks/Life. It now lives in
+`App.tsx` alongside the guide, and a new `components/ChromeActions.tsx`
+(Search / Guide / Settings) is rendered by all four page toolbars. Each page
+takes one `chrome: ChromeHandlers` prop instead of three separate callbacks.
+
+**A real bug found by driving the browser, not by typecheck/tests**: the
+first cut wrapped the active section in `<AnimatePresence>` for a
+cross-fade. Every section is a `lazy()` chunk, and a suspending child
+detaches from `AnimatePresence` mid-exit — so the outgoing section never
+finished its exit and stayed mounted. Visiting Calendar → Tasks → Life
+rendered all three stacked on top of each other. **Fixed** by dropping
+`AnimatePresence` for sections entirely and keeping an enter-only keyed
+fade, which is the whole visible effect anyway. (The guide *does* keep an
+`AnimatePresence`, with the `Suspense` boundary placed *outside* it — an
+`AnimatePresence` whose direct child is a Suspense boundary can't see the
+motion element to animate its exit.)
+
+**Verified**: `npm run typecheck` / `test` (61 tests) / `build` all clean. A
+real headless-Chrome pass (system Chrome via Playwright — the downloaded
+chromium build was corrupt; no `playwright` devDependency was added here
+either) covered the six-page guide, Month/Week, Command Palette, Settings,
+all four sections, dark + light, and 390px mobile, with zero console errors.
+Against the production build under `vite preview` with a real service worker
+and the network fully disabled: reload, section switch, and reopening the
+guide with `?` all worked offline — confirming its lazy chunk precaches
+(43 entries, up from 42).
